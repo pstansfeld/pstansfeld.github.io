@@ -1,4 +1,8 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Don't Get Solubilised</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -67,9 +71,22 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
 .item{display:flex;align-items:center;gap:9px;min-width:0;line-height:1.1;font-size:16px;color:var(--muted)}
 .item canvas{width:42px;height:42px;flex:none}
 .item strong{display:block;font-weight:400;font-size:18px;color:var(--ink)}
+.item em{font-style:normal}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
 .btn{font-family:var(--font-display);font-size:22px;color:#fff;background:var(--leaf);border:3px solid var(--ink);border-radius:14px 18px 12px 16px;box-shadow:4px 4px 0 var(--ink);padding:7px 26px;cursor:pointer}
 .btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink)}
+.btn.ghost{background:var(--card);color:var(--ink);font-size:19px;padding:6px 18px}
+.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;border:0;margin:0;padding:0;min-width:0}
+.modes legend{padding:0;margin-bottom:6px}
+.mode{position:relative;min-width:0}
+.mode input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.mode label{display:flex;flex-direction:column;gap:1px;height:100%;padding:7px 10px 6px;border:2.5px solid var(--ink);border-radius:12px 15px 11px 14px;background:var(--card);cursor:pointer;line-height:1.1}
+.mode label b{font-family:var(--font-display);font-weight:400;font-size:20px}
+.mode label span{font-size:15px;color:var(--muted)}
+.mode label i{font-style:normal;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mode input:checked + label{background:var(--leaf);color:#fff;box-shadow:3px 3px 0 var(--ink)}
+.mode input:checked + label span,.mode input:checked + label i{color:#fff}
+.mode input:focus-visible + label{outline:3px solid var(--leaf);outline-offset:3px}
 .small{font-size:16px;color:var(--muted)}
 .tag{display:inline-block;background:var(--pip);border:2px solid var(--ink);border-radius:8px;padding:0 8px;color:var(--ink)}
 @media (max-width:480px){
@@ -82,6 +99,10 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
 }
 @media (prefers-reduced-motion:reduce){.btn:active{transform:none}}
 </style>
+<noscript><style>#menu{display:none!important}</style></noscript>
+</head>
+<body>
+
 
 <div id="stage">
   <canvas id="game" aria-label="Game area: a protein in a lipid bilayer"></canvas>
@@ -100,7 +121,7 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
       <div id="plug" class="pill drug" hidden><span>Pore blocked</span><i><b id="plugbar"></b></i></div>
     </div>
     <div class="hud-r">
-      <div class="best"><div class="lbl">Best</div><div id="best" class="num sm">0</div></div>
+      <div class="best"><div id="bestLbl" class="lbl">Best</div><div id="best" class="num sm">0</div></div>
       <button id="pauseBtn" class="icon-btn" aria-label="Pause" hidden>
         <svg id="pauseIco" width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><rect x="3" y="2" width="4" height="14" rx="1.5"/><rect x="11" y="2" width="4" height="14" rx="1.5"/></svg>
       </button>
@@ -110,6 +131,8 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
     </div>
   </div>
 
+  <noscript><div class="overlay"><div class="card" role="dialog"><h1>Don't Get Solubilised</h1>
+<p>This preview has JavaScript switched off, so the game can't run here. Open the file in Safari or Chrome, or use the shared link, to play.</p></div></div></noscript>
   <div id="menu" class="overlay">
     <div class="card" role="dialog" aria-labelledby="menuT">
       <h1 id="menuT">Don't Get Solubilised</h1>
@@ -129,12 +152,18 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
         </div>
         <div class="lg">
           <div class="lbl">Dodge</div>
-          <div class="item"><canvas class="ico" data-k="det" width="84" height="84"></canvas><span><strong>Detergent</strong>Bites your legs, +1</span></div>
-          <div class="item"><canvas class="ico" data-k="drug" width="84" height="84"></canvas><span><strong>Drug</strong>Plugs your pore. No transport for 10 s</span></div>
-          <div class="item"><canvas class="ico" data-k="amp" width="84" height="84"></canvas><span><strong>Amphipol</strong>Level 2. Wraps you, +2, slows you</span></div>
-          <div class="item"><canvas class="ico" data-k="sma" width="84" height="84"></canvas><span><strong>SMA</strong>Level 3. Belts you, +3, cuts holes</span></div>
+          <div class="item"><canvas class="ico" data-k="det" width="84" height="84"></canvas><span><strong>Detergent</strong><em data-intro="det">Level 2.</em> Bites your legs, +1</span></div>
+          <div class="item"><canvas class="ico" data-k="drug" width="84" height="84"></canvas><span><strong>Drug</strong><em data-intro="drug">Level 5.</em> Plugs your pore for 10 s</span></div>
+          <div class="item"><canvas class="ico" data-k="amp" width="84" height="84"></canvas><span><strong>Amphipol</strong><em data-intro="amp">Level 6.</em> Wraps you, +2, slows you</span></div>
+          <div class="item"><canvas class="ico" data-k="sma" width="84" height="84"></canvas><span><strong>SMA</strong><em data-intro="sma">Level 7.</em> Belts you, +3, cuts holes</span></div>
         </div>
       </div>
+      <fieldset class="modes">
+        <legend class="lbl">Difficulty</legend>
+        <div class="mode"><input type="radio" name="diff" id="diff-easy" value="easy"><label for="diff-easy"><b>Easy</b><span>A gentle start</span><i id="best-easy">Best 0</i></label></div>
+        <div class="mode"><input type="radio" name="diff" id="diff-medium" value="medium"><label for="diff-medium"><b>Medium</b><span>Faster and busier</span><i id="best-medium">Best 0</i></label></div>
+        <div class="mode"><input type="radio" name="diff" id="diff-hard" value="hard"><label for="diff-hard"><b>Hard</b><span>Every baddie by level 4</span><i id="best-hard">Best 0</i></label></div>
+      </fieldset>
       <div class="row"><button id="playBtn" class="btn">Play</button><span class="small">← → or A D, mouse, or drag. P pauses.</span></div>
     </div>
   </div>
@@ -153,7 +182,7 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
       <p id="overMsg"></p>
       <p id="overBest" class="small"></p>
       <p id="overTip" class="small"></p>
-      <div class="row"><button id="againBtn" class="btn">Play again</button></div>
+      <div class="row"><button id="againBtn" class="btn">Play again</button><button id="modeBtn" class="btn ghost">Change difficulty</button></div>
     </div>
   </div>
 </div>
@@ -172,11 +201,64 @@ const C = {
 const MAX_DET = 10, SHIELD_S = 10, BOOST_S = 8, PLUG_S = 10, PLUG_DY = 140, BIND_S = 5;
 const MEM_COL = { chol: C.chol, pip: C.pip, gm3: C.sia };
 const WEIGHT = { det: 1, amp: 2, sma: 3 };
-const LEVELS = [
-  { at: 0, title: 'Level 1', sub: 'Catch solutes, dodge detergents' },
-  { at: 40, title: 'Level 2', sub: 'Amphipols! They wrap your legs and slow you down' },
-  { at: 85, title: 'Level 3', sub: 'SMA! It belts you or cuts holes in the bilayer' }
-];
+// Level plans: the level at which each thing first appears, with the banner for each level.
+// Easy/Medium introduce one idea per level; Hard throws everything in within four levels.
+const PLANS = {
+  std: {
+    intro: { det: 2, chol: 2, pip: 3, gm3: 4, nd: 4, drug: 5, amp: 6, sma: 7 },
+    levels: [
+      { dur: 20, sub: 'Catch solutes and ions and carry them through' },
+      { dur: 30, sub: 'Detergents! Grab cholesterol in the membrane to knock them off' },
+      { dur: 30, sub: 'PIP₂ in the lower leaflet knocks off two' },
+      { dur: 30, sub: 'GM3 doubles your points. Nanodiscs shield you' },
+      { dur: 30, sub: 'Drugs plug your pore. PIP₂ pops them out' },
+      { dur: 30, sub: 'Amphipols wrap your legs and slow you down' },
+      { dur: 30, sub: 'SMA belts you and cuts holes in the bilayer' }
+    ]
+  },
+  hard: {
+    intro: { det: 1, chol: 1, pip: 2, amp: 2, gm3: 3, nd: 3, sma: 3, drug: 4 },
+    levels: [
+      { dur: 25, sub: 'Detergents from the start! Grab cholesterol to knock them off' },
+      { dur: 30, sub: 'Amphipols wrap and slow you. PIP₂ knocks off two' },
+      { dur: 30, sub: 'SMA cuts holes. GM3 and nanodiscs to the rescue' },
+      { dur: 30, sub: 'Drugs plug your pore. PIP₂ pops them out' }
+    ]
+  }
+};
+// Difficulty modes: plan, speed, drop rate, baddie share (poly = extra for amphipols/SMA), level length,
+// lipid linger time, how early detergents come in groups, baddies removed per cleared level, baddie ceiling
+const MODES = {
+  easy:   { label: 'Easy',   plan: 'std',  speed: 1.0,  gap: 1.0,  foe: 1.0, poly: 1.0, dur: 1.0,  stay: 0,    groups: 0, clear: 2, cap: 330, ceil: 0.6 },
+  medium: { label: 'Medium', plan: 'std',  speed: 1.25, gap: 0.86, foe: 1.3, poly: 1.2, dur: 0.85, stay: -0.6, groups: 1, clear: 1, cap: 370, ceil: 0.62 },
+  hard:   { label: 'Hard',   plan: 'hard', speed: 1.5,  gap: 0.74, foe: 1.9, poly: 1.3, dur: 0.75, stay: -1.0, groups: 2, clear: 0, cap: 410, ceil: 0.68 }
+};
+const plan = () => PLANS[MODES[G.diff].plan];
+const levelDur = L => { const p = plan().levels; return Math.round((L <= p.length ? p[L - 1].dur : 35) * MODES[G.diff].dur); };
+function cfg(L) {
+  const M = MODES[G.diff], g = M.groups, I = plan().intro;
+  const i = Math.min(L, 7) - 1, k = Math.max(0, L - 7);
+  const since = key => L - I[key];                 // levels since this thing appeared (negative = not yet)
+  const dl = since('det');
+  const c = {
+    vy:     Math.min(M.cap, ([105, 115, 128, 140, 152, 164, 176][i] + k * 14) * M.speed),   // fall speed
+    gap:    Math.max(0.36, ([1.15, 1.05, 1.0, 0.95, 0.9, 0.85, 0.8][i] - k * 0.04) * M.gap),  // seconds between drops
+    det:    dl < 0 ? 0 : Math.min(0.42, ([0.11, 0.14, 0.17, 0.18, 0.16, 0.15][Math.min(dl, 5)] + Math.max(0, dl - 5) * 0.02) * M.foe),
+    pair:   dl < 2 - g ? 0 : dl < 4 - g ? 0.18 : Math.min(0.5, 0.28 + k * 0.04 + g * 0.05),
+    triple: dl < 6 - 2 * g ? 0 : Math.min(0.3, 0.06 + k * 0.03 + g * 0.03),
+    amp:    since('amp') < 0 ? 0 : (0.06 + Math.min(0.05, since('amp') * 0.01)) * M.foe * M.poly,
+    sma:    since('sma') < 0 ? 0 : (0.05 + Math.min(0.04, since('sma') * 0.008)) * M.foe * M.poly,
+    drug:   since('drug') < 0 ? 0 : (0.03 + Math.min(0.025, since('drug') * 0.005)) * M.foe,
+    nd:     since('nd') < 0 ? 0 : 0.03,
+    mem:    ['chol', 'pip', 'gm3'].filter(key => since(key) >= 0),
+    stay:   Math.max(1.6, 4.4 - (L - 2) * 0.3 + M.stay),                           // how long membrane lipids linger
+    memGap: since('gm3') < 0 ? [3.5, 5.5] : [4.5, 7.5]
+  };
+  // never let baddies crowd out the solutes entirely
+  const foes = c.det + c.amp + c.sma + c.drug;
+  if (foes > M.ceil) for (const key of ['det', 'amp', 'sma', 'drug']) c[key] *= M.ceil / foes;
+  return c;
+}
 const BANDS = [-30, 26, 80];
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = s => document.querySelector(s);
@@ -191,7 +273,7 @@ let W = 960, H = 600, scale = 1, ox = 0, oy = 0, dpr = 1, MC = 430, HY = 272;
 const MAXV = 560, HEAD_R = 80;
 const P = { x:480, tx:480, vx:0, phase:0, catchT:0, hurtT:0, blinkIn:2.5, blink:0,
   lookX:0, lookY:0, worry:0, aL:-0.3, aR:-0.3, hy:272, bounce:0, lift:0, hands:[{x:0,y:0},{x:0,y:0}] };
-const G = { mode:'menu', score:0, combo:0, solutes:0, ions:0, t:0, level:1, banner:null, spawnIn:1, shield:0, boost:0, memIn:5, plug:0, plugA:1, plugFx:0, plugFy:0, plugAng:0, blockMsgT:0, snapT:0,
+const G = { mode:'menu', score:0, combo:0, solutes:0, ions:0, t:0, level:1, levelT:0, banner:null, spawnIn:1, shield:0, boost:0, memIn:5, plug:0, plugA:1, plugFx:0, plugFy:0, plugAng:0, blockMsgT:0, snapT:0,
   push:0, gap:1, instab:0, best:0, shake:0 };
 let items = [], parts = [], texts = [], lipU = [], lipL = [], water = [], inserted = [], attached = [], flyers = [], holes = [];
 let cargo = [], released = [], memItems = [];
@@ -202,7 +284,12 @@ const keys = { l:false, r:false };
 const SLOTS = [];
 for (let i = 0; i < 5; i++) { SLOTS.push({ side:-1, dy:-60 + i * 36 }); SLOTS.push({ side:1, dy:-42 + i * 36 }); }
 
-try { G.best = parseInt(localStorage.getItem('dgs-best') || '0', 10) || 0; } catch (e) {}
+G.diff = 'easy';
+const bests = { easy: 0, medium: 0, hard: 0 };
+try {
+  for (const k in bests) bests[k] = parseInt(localStorage.getItem('dgs-best-' + k) || '0', 10) || 0;
+  const d = localStorage.getItem('dgs-diff'); if (MODES[d]) G.diff = d;
+} catch (e) {}
 
 /* ---------- sizing ---------- */
 function resize() {
@@ -705,15 +792,18 @@ function drawMem() {
   }
 }
 function spawnMem() {
-  const d = Math.min(1, G.t / 110), r = Math.random();
-  const type = r < 0.45 ? 'chol' : r < 0.75 ? 'pip' : 'gm3';
+  const c = cfg(G.level), types = c.mem;
+  if (!types.length) return;
+  // the newest lipid shows up more often on the level that introduces it
+  const pick = types.length === 1 ? types[0] : (Math.random() < 0.4 && G.level <= 4 ? types[types.length - 1] : types[Math.floor(Math.random() * types.length)]);
+  const type = pick, d = clamp((G.level - 2) / 6, 0, 1);
   const leaf = type === 'pip' ? 'low' : type === 'gm3' ? 'up' : (Math.random() < 0.5 ? 'up' : 'low');
   // come in from the side away from the protein, so you have to go and get it
   const fromLeft = P.x > W / 2;
   let tx = fromLeft ? rnd(130, W / 2) : rnd(W / 2, W - 130);
   if (Math.abs(tx - P.x) < 200) tx = clamp(P.x + (fromLeft ? -200 : 200), 130, W - 130);
   const sx = fromLeft ? -50 : W + 50;
-  memItems.push({ type, leaf, sx, tx, x: sx, t: 0, tin: lerp(1.4, 1.0, d), stay: lerp(3.4, 2.0, d), tout: lerp(1.3, 0.9, d), ph: rnd(0, TAU), state: 'in' });
+  memItems.push({ type, leaf, sx, tx, x: sx, t: 0, tin: lerp(1.4, 1.0, d), stay: c.stay, tout: lerp(1.3, 0.9, d), ph: rnd(0, TAU), state: 'in' });
   sfx('lipidIn');
 }
 function catchMem(m) {
@@ -750,7 +840,10 @@ function catchMem(m) {
 function updateMem(dt, playing) {
   if (playing) {
     G.memIn -= dt;
-    if (G.memIn <= 0 && memItems.filter(m => m.state !== 'caught').length < 2) { spawnMem(); G.memIn = rnd(4.5, 7.5); }
+    if (G.memIn <= 0 && memItems.filter(m => m.state !== 'caught').length < 2) {
+      const c = cfg(G.level);
+      if (c.mem.length) { spawnMem(); G.memIn = rnd(c.memGap[0], c.memGap[1]); } else G.memIn = 1;
+    }
   }
   for (const m of memItems) {
     if (m.state === 'caught') {
@@ -1003,20 +1096,15 @@ function cheer(x, range) {
   }
 }
 function spawn() {
-  const d = Math.min(1, G.t / 110), L = G.level;
-  const table = [
-    ['det', 0.2 + 0.24 * d - (L >= 2 ? 0.05 : 0) - (L >= 3 ? 0.04 : 0)],
-    ['amp', L >= 2 ? 0.08 + 0.04 * d : 0],
-    ['sma', L >= 3 ? 0.07 : 0],
-    ['drug', G.t > 20 ? 0.04 + 0.02 * d : 0], ['nd', G.t > 15 ? 0.028 : 0], ['ion', 0.25]
-  ];
+  const c = cfg(G.level);
+  const table = [['det', c.det], ['amp', c.amp], ['sma', c.sma], ['drug', c.drug], ['nd', c.nd], ['ion', 0.25]];
   let r = Math.random(), type = 'lig';
   for (const [k, p] of table) { if (r < p) { type = k; break; } r -= p; }
-  const n = type === 'det' ? 1 + (Math.random() < 0.25 + 0.35 * d ? 1 : 0) + (Math.random() < 0.2 * d ? 1 : 0)
+  const n = type === 'det' ? 1 + (Math.random() < c.pair ? 1 : 0) + (Math.random() < c.triple ? 1 : 0)
     : type === 'ion' ? 1 + (Math.random() < 0.45 ? 1 : 0) + (Math.random() < 0.15 ? 1 : 0) : 1;
   const base = rnd(60, W - 60), poly = type === 'amp' || type === 'sma';
   for (let i = 0; i < n; i++) {
-    const vy = (120 + 210 * d) * rnd(0.85, 1.15) * Math.sqrt(H / 600) * (type === 'det' ? 1.05 : poly ? 0.85 : type === 'ion' ? 1.12 : 1);
+    const vy = c.vy * rnd(0.88, 1.12) * Math.sqrt(H / 600) * (type === 'det' ? 1.05 : poly ? 0.85 : type === 'ion' ? 1.12 : 1);
     const x0 = clamp(base + (i ? rnd(-80, 80) : 0), 40, W - 40);
     items.push({ type, x0, x: x0, y: -40 - i * rnd(25, 70), vy, t: 0,
       wa: type === 'det' ? rnd(16, 34) : poly ? rnd(40, 70) : type === 'ion' ? rnd(8, 18) : rnd(6, 22), wf: poly ? rnd(1, 1.6) : rnd(1.2, 2.6), wp: rnd(0, TAU),
@@ -1142,13 +1230,13 @@ const TIPS = [
 ];
 function endGame() {
   G.mode = 'over'; P.hurtT = 0; cargo = [];
-  const newBest = G.score > G.best && G.score > 0;
-  if (newBest) { G.best = G.score; try { localStorage.setItem('dgs-best', String(G.best)); } catch (e) {} }
+  const d = G.diff, newBest = G.score > bests[d] && G.score > 0;
+  if (newBest) { bests[d] = G.score; try { localStorage.setItem('dgs-best-' + d, String(G.score)); } catch (e) {} syncModes(); }
   sfx('over');
   setTimeout(() => {
     if (G.mode !== 'over') return;
-    $('#overMsg').textContent = `Mr Membrane Protein was pulled out of the bilayer on level ${G.level}. You transported ${G.solutes} solute${G.solutes === 1 ? '' : 's'} and ${G.ions} ion${G.ions === 1 ? '' : 's'} for ${G.score} points.`;
-    $('#overBest').innerHTML = newBest ? '<span class="tag">New best score</span>' : `Best: ${G.best}`;
+    $('#overMsg').textContent = `Mr Membrane Protein was pulled out of the bilayer on level ${G.level} (${MODES[d].label}). You transported ${G.solutes} solute${G.solutes === 1 ? '' : 's'} and ${G.ions} ion${G.ions === 1 ? '' : 's'} for ${G.score} points.`;
+    $('#overBest').innerHTML = newBest ? `<span class="tag">New ${MODES[d].label} best</span>` : `${MODES[d].label} best: ${bests[d]}`;
     $('#overTip').textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
     show('over');
   }, 2000);
@@ -1157,12 +1245,27 @@ function show(id) {
   for (const o of ['menu', 'pause', 'over']) $('#' + o).hidden = o !== id;
   if (id) { const b = $('#' + id + ' .btn'); if (b) b.focus({ preventScroll: true }); }
 }
-function banner(i) { G.banner = { title: LEVELS[i].title, sub: LEVELS[i].sub, t: 3, dur: 3 }; }
+function banner(L) { const p = plan().levels; G.banner = { title: 'Level ' + L, sub: L <= p.length ? p[L - 1].sub : 'Everything at once, and faster', t: 3.2, dur: 3.2 }; }
+function syncModes() {
+  for (const k in MODES) {
+    $('#diff-' + k).checked = k === G.diff;
+    $('#best-' + k).textContent = 'Best ' + bests[k];
+  }
+  $('#bestLbl').textContent = 'Best · ' + MODES[G.diff].label;
+  const I = plan().intro;
+  document.querySelectorAll('[data-intro]').forEach(el => { el.textContent = I[el.dataset.intro] <= 1 ? 'From the start.' : `Level ${I[el.dataset.intro]}.`; });
+}
+function setDiff(d) {
+  if (!MODES[d] || G.mode === 'playing' || G.mode === 'paused') return;
+  G.diff = d;
+  try { localStorage.setItem('dgs-diff', d); } catch (e) {}
+  syncModes();
+}
 function startGame() {
-  Object.assign(G, { mode: 'playing', score: 0, combo: 0, solutes: 0, ions: 0, t: 0, level: 1, spawnIn: 1.2, shield: 0, boost: 0, memIn: 4, plug: 0, plugA: 1 });
+  Object.assign(G, { mode: 'playing', score: 0, combo: 0, solutes: 0, ions: 0, t: 0, level: 1, levelT: 0, spawnIn: 1.2, shield: 0, boost: 0, memIn: 4, plug: 0, plugA: 1 });
   items = []; parts = []; texts = []; inserted = []; attached = []; flyers = []; holes = []; cargo = []; released = []; memItems = [];
   P.hurtT = 0; P.catchT = 0; P.lift = 0; inputMode = 'none';
-  banner(0);
+  banner(1);
   show(null); sfx('start'); last = performance.now();
 }
 function pause() { if (G.mode !== 'playing') return; G.mode = 'paused'; keys.l = keys.r = false; show('pause'); }
@@ -1263,13 +1366,19 @@ function update(dt) {
       if (G.shield === 0) sfx('shieldOff');
       else if (G.shield <= 3 && Math.ceil(prevSh) !== Math.ceil(G.shield)) sfx('shieldWarn');
     }
-    const lv = G.t >= LEVELS[2].at ? 3 : G.t >= LEVELS[1].at ? 2 : 1;
-    if (lv > G.level) { G.level = lv; banner(lv - 1); sfx('level'); }
+    G.levelT += dt;
+    if (G.levelT >= levelDur(G.level)) {
+      G.level++; G.levelT = 0;
+      banner(G.level); sfx('level');
+      if (G.level === plan().intro.chol) G.memIn = 2.5;
+      // reward for clearing a level: the membrane recovers a little (Easy 2, Medium 1, Hard none)
+      const k = knockOff(MODES[G.diff].clear);
+      if (k) say(P.x, P.hy - 112, `Level cleared: ${k} knocked off`, C.leaf, 26);
+    }
     G.spawnIn -= dt;
     if (G.spawnIn <= 0) {
       spawn();
-      const d = Math.min(1, G.t / 110);
-      G.spawnIn = (0.95 - 0.55 * d) * rnd(0.75, 1.25) * Math.sqrt(960 / W);
+      G.spawnIn = cfg(G.level).gap * rnd(0.75, 1.25) * Math.sqrt(960 / W);
     }
   }
 
@@ -1369,7 +1478,7 @@ const hudC = {};
 function setText(id, v) { if (hudC[id] !== v) { hudC[id] = v; $('#' + id).textContent = v; } }
 function hud() {
   setText('score', String(G.score));
-  setText('best', String(Math.max(G.best, G.score)));
+  setText('best', String(Math.max(bests[G.diff], G.score)));
   const m = multOf(G.combo);
   setText('combo', G.combo >= 2 ? `combo ${G.combo}${m > 1 ? ' · ×' + m : ''}` : '');
   const n = Math.min(MAX_DET, boundSum()), sig = attached.map(a => a.kind[0]).join('') + G.level;
@@ -1432,6 +1541,8 @@ cv.addEventListener('pointermove', e => {
 });
 $('#playBtn').addEventListener('click', startGame);
 $('#againBtn').addEventListener('click', startGame);
+$('#modeBtn').addEventListener('click', () => { G.mode = 'menu'; attached = []; cargo = []; G.plug = 0; P.lift = 0; syncModes(); show('menu'); });
+document.querySelectorAll('input[name="diff"]').forEach(r => r.addEventListener('change', () => { if (r.checked) setDiff(r.value); }));
 $('#resumeBtn').addEventListener('click', resume);
 $('#pauseBtn').addEventListener('click', () => { if (G.mode === 'playing') pause(); else resume(); });
 $('#soundBtn').addEventListener('click', () => {
@@ -1471,20 +1582,23 @@ function boot(data) {
   const kinds = Array.isArray(data.bound) ? data.bound : [];
   const sum = kinds.reduce((s, k) => s + (WEIGHT[k] || 0), 0);
   if ((data.mode === 'playing' || data.mode === 'paused') && sum < MAX_DET) {
-    Object.assign(G, { score: data.score | 0, combo: data.combo | 0, solutes: data.solutes | 0, ions: data.ions | 0, t: data.t || 0, level: data.level || 1, mode: 'paused' });
+    Object.assign(G, { score: data.score | 0, combo: data.combo | 0, solutes: data.solutes | 0, ions: data.ions | 0, t: data.t || 0, level: data.level || 1, levelT: data.levelT || 0, mode: 'paused' });
+    if (MODES[data.diff]) G.diff = data.diff;
     for (const k of kinds) {
       if (k === 'det') attachDet({ x: P.x, y: MC, hd: 0 }); else if (WEIGHT[k]) attachWrap(k);
       attached[attached.length - 1].t = 1;
     }
     show('pause');
   } else show('menu');
+  syncModes();
   new ResizeObserver(resize).observe(stage);
   last = performance.now();
   requestAnimationFrame(loop);
 }
-window.claude?.hot?.snapshot?.(() => ({ mode: G.mode, score: G.score, combo: G.combo, solutes: G.solutes, ions: G.ions, t: G.t, level: G.level, bound: attached.map(a => a.kind), px: P.x }));
+window.claude?.hot?.snapshot?.(() => ({ mode: G.mode, diff: G.diff, score: G.score, combo: G.combo, solutes: G.solutes, ions: G.ions, t: G.t, level: G.level, levelT: G.levelT, bound: attached.map(a => a.kind), px: P.x }));
 window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
 })();
 </script>
 
-</body></html>
+</body>
+</html>
