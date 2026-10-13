@@ -1,0 +1,1604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Don't Get Solubilised</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Permanent+Marker&display=swap">
+<style>
+/* Layout: one-screen whiteboard arcade. A framed paper stage fills the viewport, a marker-pen HUD floats over the bilayer, and cards pop up for menu / pause / game over. Deliberately single-theme to match the hand-drawn cartoon. */
+:root{
+  --frame:#d5d9cf;
+  --paper:#ececea;
+  --card:#f8f8f4;
+  --ink:#1b1d1a;
+  --leaf:#4f9a17;
+  --muted:#5d645a;
+  --pip:#f2a23a;
+  --det:#c9a5ca;
+  --amp:#d4559b;
+  --sma:#8f979e;
+  --msp:#38b2a3;
+  --gm3:#a54399;
+  --drug:#3b4a8c;
+  --danger:#d8262a;
+  --danger-bg:#f6e0df;
+  --font-display:"Permanent Marker","Marker Felt","Comic Sans MS",cursive;
+  --font-body:"Patrick Hand","Chalkboard SE","Comic Sans MS",cursive;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-body);font-size:18px;display:flex;flex-direction:column;padding-block:12px;padding-inline:16px;overflow:hidden}
+#stage{position:relative;flex:1;min-height:0;background:var(--paper);border:3px solid var(--ink);border-radius:22px 28px 20px 26px / 26px 20px 28px 22px;overflow:hidden;box-shadow:5px 5px 0 var(--ink)}
+#game{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.hud{position:absolute;top:0;left:0;right:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:8px;padding:10px 14px;pointer-events:none}
+.lbl{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);line-height:1}
+.num{font-family:var(--font-display);font-size:clamp(24px,3.6vw,36px);line-height:1.05;font-variant-numeric:tabular-nums}
+.num.sm{font-size:clamp(18px,2.4vw,24px)}
+.sub{font-size:16px;min-height:1.2em;color:var(--muted)}
+.hud-c{display:flex;flex-direction:column;align-items:center;gap:5px;padding-top:2px}
+.meter{display:flex;gap:3px;padding:4px 7px;background:var(--card);border:2px solid var(--ink);border-radius:999px}
+.meter i{display:block;width:12px;height:12px;border-radius:50%;border:1.8px solid var(--ink)}
+.meter i.det{background:var(--det)}
+.meter i.amp{background:var(--amp)}
+.meter i.sma{background:var(--sma)}
+.meter.danger{background:var(--danger-bg);border-color:var(--danger)}
+.hud-c .lbl.danger{color:var(--danger)}
+.pill{display:flex;align-items:center;gap:6px;font-size:16px;background:var(--card);border:2px solid var(--ink);border-radius:999px;padding:1px 10px 1px 9px;white-space:nowrap}
+.pill i{display:block;width:56px;height:8px;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden}
+.pill b{display:block;height:100%;width:100%;background:var(--msp)}
+.pill.gm3 b{background:var(--gm3)}
+.pill.drug{border-color:var(--drug);color:var(--drug)}
+.pill.drug b{background:var(--drug)}
+.hud-r{display:flex;justify-content:flex-end;align-items:flex-start;gap:8px}
+.best{text-align:right;margin-right:2px}
+.icon-btn{pointer-events:auto;width:40px;height:40px;display:grid;place-items:center;background:var(--card);border:2.5px solid var(--ink);border-radius:46% 54% 50% 50% / 52% 48% 52% 48%;color:var(--ink);cursor:pointer;padding:0;flex:none}
+.icon-btn:hover{background:var(--paper)}
+.icon-btn:focus-visible,.btn:focus-visible{outline:3px solid var(--leaf);outline-offset:3px}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(236,236,234,.62);backdrop-filter:blur(2px)}
+.card{width:100%;max-width:700px;max-height:100%;overflow:auto;background:var(--card);border:3px solid var(--ink);border-radius:18px 24px 16px 22px / 22px 16px 24px 18px;box-shadow:6px 6px 0 var(--ink);padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+.card h1,.card h2{font-family:var(--font-display);font-weight:400;margin:0;line-height:1.05;text-wrap:balance}
+.card h1{font-size:clamp(28px,6vw,38px)}
+.card h2{font-size:clamp(26px,5vw,34px)}
+.card p{margin:0;line-height:1.25;max-width:60ch}
+.legend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 18px}
+@media (max-width:680px){.legend{grid-template-columns:1fr}}
+.lg{display:flex;flex-direction:column;gap:8px;min-width:0}
+.item{display:flex;align-items:center;gap:9px;min-width:0;line-height:1.1;font-size:16px;color:var(--muted)}
+.item canvas{width:42px;height:42px;flex:none}
+.item strong{display:block;font-weight:400;font-size:18px;color:var(--ink)}
+.item em{font-style:normal}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.btn{font-family:var(--font-display);font-size:22px;color:#fff;background:var(--leaf);border:3px solid var(--ink);border-radius:14px 18px 12px 16px;box-shadow:4px 4px 0 var(--ink);padding:7px 26px;cursor:pointer}
+.btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink)}
+.btn.ghost{background:var(--card);color:var(--ink);font-size:19px;padding:6px 18px}
+.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;border:0;margin:0;padding:0;min-width:0}
+.modes legend{padding:0;margin-bottom:6px}
+.mode{position:relative;min-width:0}
+.mode input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.mode label{display:flex;flex-direction:column;gap:1px;height:100%;padding:7px 10px 6px;border:2.5px solid var(--ink);border-radius:12px 15px 11px 14px;background:var(--card);cursor:pointer;line-height:1.1}
+.mode label b{font-family:var(--font-display);font-weight:400;font-size:20px}
+.mode label span{font-size:15px;color:var(--muted)}
+.mode label i{font-style:normal;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mode input:checked + label{background:var(--leaf);color:#fff;box-shadow:3px 3px 0 var(--ink)}
+.mode input:checked + label span,.mode input:checked + label i{color:#fff}
+.mode input:focus-visible + label{outline:3px solid var(--leaf);outline-offset:3px}
+.small{font-size:16px;color:var(--muted)}
+.tag{display:inline-block;background:var(--pip);border:2px solid var(--ink);border-radius:8px;padding:0 8px;color:var(--ink)}
+@media (max-width:480px){
+  .legend{grid-template-columns:1fr}
+  .hud{padding:8px 10px;gap:6px}
+  .icon-btn{width:34px;height:34px}
+  .meter{gap:2px;padding:3px 5px}
+  .meter i{width:8px;height:8px;border-width:1.5px}
+  .hud-c .lbl{font-size:11px}
+}
+@media (prefers-reduced-motion:reduce){.btn:active{transform:none}}
+</style>
+<noscript><style>#menu{display:none!important}</style></noscript>
+</head>
+<body>
+
+
+<div id="stage">
+  <canvas id="game" aria-label="Game area: a protein in a lipid bilayer"></canvas>
+
+  <div class="hud">
+    <div>
+      <div class="lbl">Score</div>
+      <div id="score" class="num">0</div>
+      <div id="combo" class="sub"></div>
+    </div>
+    <div class="hud-c">
+      <div id="meterLbl" class="lbl">Level 1 · Bound 0/10</div>
+      <div id="meter" class="meter" role="img" aria-label="0 of 10 bound"></div>
+      <div id="shield" class="pill" hidden><span>Nanodisc</span><i><b id="shieldbar"></b></i></div>
+      <div id="boost" class="pill gm3" hidden><span>GM3 ×2</span><i><b id="boostbar"></b></i></div>
+      <div id="plug" class="pill drug" hidden><span>Pore blocked</span><i><b id="plugbar"></b></i></div>
+    </div>
+    <div class="hud-r">
+      <div class="best"><div id="bestLbl" class="lbl">Best</div><div id="best" class="num sm">0</div></div>
+      <button id="pauseBtn" class="icon-btn" aria-label="Pause" hidden>
+        <svg id="pauseIco" width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><rect x="3" y="2" width="4" height="14" rx="1.5"/><rect x="11" y="2" width="4" height="14" rx="1.5"/></svg>
+      </button>
+      <button id="soundBtn" class="icon-btn" aria-label="Mute sound">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h4l5-4v14l-5-4H3z" fill="currentColor"/><g id="sndOn"><path d="M15 8c1.3 1.6 1.3 4.4 0 6"/><path d="M17.5 5.5c2.7 3 2.7 8 0 11"/></g><g id="sndOff" style="display:none"><path d="M15 8l5 6M20 8l-5 6"/></g></svg>
+      </button>
+    </div>
+  </div>
+
+  <noscript><div class="overlay"><div class="card" role="dialog"><h1>Don't Get Solubilised</h1>
+<p>This preview has JavaScript switched off, so the game can't run here. Open the file in Safari or Chrome, or use the shared link, to play.</p></div></div></noscript>
+  <div id="menu" class="overlay">
+    <div class="card" role="dialog" aria-labelledby="menuT">
+      <h1 id="menuT">Don't Get Solubilised</h1>
+      <p>Catch solutes and ions with your hands or head and carry them through to the cytoplasm. Helpful lipids drift in through the bilayer, so slide over and grab them before they drift away. Baddies cling to your legs. Ten bound and you're solubilised.</p>
+      <div class="legend">
+        <div class="lg">
+          <div class="lbl">Catch from above</div>
+          <div class="item"><canvas class="ico" data-k="lig" width="84" height="84"></canvas><span><strong>Solute</strong>Carry it through, +10</span></div>
+          <div class="item"><canvas class="ico" data-k="ion" width="84" height="84"></canvas><span><strong>Ion</strong>Na⁺ or Cl⁻, carry it through, +5</span></div>
+          <div class="item"><canvas class="ico" data-k="nd" width="84" height="84"></canvas><span><strong>Nanodisc</strong>Shield for 10 s</span></div>
+        </div>
+        <div class="lg">
+          <div class="lbl">Grab in the membrane</div>
+          <div class="item"><canvas class="ico" data-k="chol" width="84" height="84"></canvas><span><strong>Cholesterol</strong>Both leaflets. Knocks off 1 baddie</span></div>
+          <div class="item"><canvas class="ico" data-k="pip" width="84" height="84"></canvas><span><strong>PIP₂</strong>Lower leaflet. Unplugs a drug, knocks off 2 baddies</span></div>
+          <div class="item"><canvas class="ico" data-k="gm3" width="84" height="84"></canvas><span><strong>GM3</strong>Upper leaflet. Double points for 8 s</span></div>
+        </div>
+        <div class="lg">
+          <div class="lbl">Dodge</div>
+          <div class="item"><canvas class="ico" data-k="det" width="84" height="84"></canvas><span><strong>Detergent</strong><em data-intro="det">Level 2.</em> Bites your legs, +1</span></div>
+          <div class="item"><canvas class="ico" data-k="drug" width="84" height="84"></canvas><span><strong>Drug</strong><em data-intro="drug">Level 5.</em> Plugs your pore for 10 s</span></div>
+          <div class="item"><canvas class="ico" data-k="amp" width="84" height="84"></canvas><span><strong>Amphipol</strong><em data-intro="amp">Level 6.</em> Wraps you, +2, slows you</span></div>
+          <div class="item"><canvas class="ico" data-k="sma" width="84" height="84"></canvas><span><strong>SMA</strong><em data-intro="sma">Level 7.</em> Belts you, +3, cuts holes</span></div>
+        </div>
+      </div>
+      <fieldset class="modes">
+        <legend class="lbl">Difficulty</legend>
+        <div class="mode"><input type="radio" name="diff" id="diff-easy" value="easy"><label for="diff-easy"><b>Easy</b><span>A gentle start</span><i id="best-easy">Best 0</i></label></div>
+        <div class="mode"><input type="radio" name="diff" id="diff-medium" value="medium"><label for="diff-medium"><b>Medium</b><span>Faster and busier</span><i id="best-medium">Best 0</i></label></div>
+        <div class="mode"><input type="radio" name="diff" id="diff-hard" value="hard"><label for="diff-hard"><b>Hard</b><span>Every baddie by level 4</span><i id="best-hard">Best 0</i></label></div>
+      </fieldset>
+      <div class="row"><button id="playBtn" class="btn">Play</button><span class="small">← → or A D, mouse, or drag. P pauses.</span></div>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay" hidden>
+    <div class="card" role="dialog" aria-labelledby="pauseT">
+      <h2 id="pauseT">Paused</h2>
+      <p>Mr Membrane Protein is waiting in the bilayer.</p>
+      <div class="row"><button id="resumeBtn" class="btn">Resume</button><span class="small">or press P</span></div>
+    </div>
+  </div>
+
+  <div id="over" class="overlay" hidden>
+    <div class="card" role="dialog" aria-labelledby="overT">
+      <h2 id="overT">Solubilised!</h2>
+      <p id="overMsg"></p>
+      <p id="overBest" class="small"></p>
+      <p id="overTip" class="small"></p>
+      <div class="row"><button id="againBtn" class="btn">Play again</button><button id="modeBtn" class="btn ghost">Change difficulty</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const TAU = Math.PI * 2, PI = Math.PI;
+const C = {
+  ink:'#1b1d1a', leaf:'#4f9a17', leafD:'#3a7311', lipid:'#7aa6da', tail:'#6c9bd2',
+  chol:'#e0262a', pip:'#f2a23a', pipP:'#ffd84a', lig:'#ffc83a', oxy:'#e8513a',
+  det:'#c9a5ca', detD:'#5a4466', amp:'#d4559b', ampD:'#9c2f6b', sma:'#8f979e', smaD:'#555c62',
+  msp:'#38b2a3', mspD:'#22786d', na:'#9ad6e8', cl:'#a6dd8a', glc:'#0072bc', gal:'#ffd400', sia:'#a54399', drug:'#3b4a8c', paper:'#ececea', muted:'#6b7268', white:'#fbfbf7',
+  water:'#6a8fbd', tongue:'#e46a6a'
+};
+const MAX_DET = 10, SHIELD_S = 10, BOOST_S = 8, PLUG_S = 10, PLUG_DY = 140, BIND_S = 5;
+const MEM_COL = { chol: C.chol, pip: C.pip, gm3: C.sia };
+const WEIGHT = { det: 1, amp: 2, sma: 3 };
+// Level plans: the level at which each thing first appears, with the banner for each level.
+// Easy/Medium introduce one idea per level; Hard throws everything in within four levels.
+const PLANS = {
+  std: {
+    intro: { det: 2, chol: 2, pip: 3, gm3: 4, nd: 4, drug: 5, amp: 6, sma: 7 },
+    levels: [
+      { dur: 20, sub: 'Catch solutes and ions and carry them through' },
+      { dur: 30, sub: 'Detergents! Grab cholesterol in the membrane to knock them off' },
+      { dur: 30, sub: 'PIP₂ in the lower leaflet knocks off two' },
+      { dur: 30, sub: 'GM3 doubles your points. Nanodiscs shield you' },
+      { dur: 30, sub: 'Drugs plug your pore. PIP₂ pops them out' },
+      { dur: 30, sub: 'Amphipols wrap your legs and slow you down' },
+      { dur: 30, sub: 'SMA belts you and cuts holes in the bilayer' }
+    ]
+  },
+  hard: {
+    intro: { det: 1, chol: 1, pip: 2, amp: 2, gm3: 3, nd: 3, sma: 3, drug: 4 },
+    levels: [
+      { dur: 25, sub: 'Detergents from the start! Grab cholesterol to knock them off' },
+      { dur: 30, sub: 'Amphipols wrap and slow you. PIP₂ knocks off two' },
+      { dur: 30, sub: 'SMA cuts holes. GM3 and nanodiscs to the rescue' },
+      { dur: 30, sub: 'Drugs plug your pore. PIP₂ pops them out' }
+    ]
+  }
+};
+// Difficulty modes: plan, speed, drop rate, baddie share (poly = extra for amphipols/SMA), level length,
+// lipid linger time, how early detergents come in groups, baddies removed per cleared level, baddie ceiling
+const MODES = {
+  easy:   { label: 'Easy',   plan: 'std',  speed: 1.0,  gap: 1.0,  foe: 1.0, poly: 1.0, dur: 1.0,  stay: 0,    groups: 0, clear: 2, cap: 330, ceil: 0.6 },
+  medium: { label: 'Medium', plan: 'std',  speed: 1.25, gap: 0.86, foe: 1.3, poly: 1.2, dur: 0.85, stay: -0.6, groups: 1, clear: 1, cap: 370, ceil: 0.62 },
+  hard:   { label: 'Hard',   plan: 'hard', speed: 1.5,  gap: 0.74, foe: 1.9, poly: 1.3, dur: 0.75, stay: -1.0, groups: 2, clear: 0, cap: 410, ceil: 0.68 }
+};
+const plan = () => PLANS[MODES[G.diff].plan];
+const levelDur = L => { const p = plan().levels; return Math.round((L <= p.length ? p[L - 1].dur : 35) * MODES[G.diff].dur); };
+function cfg(L) {
+  const M = MODES[G.diff], g = M.groups, I = plan().intro;
+  const i = Math.min(L, 7) - 1, k = Math.max(0, L - 7);
+  const since = key => L - I[key];                 // levels since this thing appeared (negative = not yet)
+  const dl = since('det');
+  const c = {
+    vy:     Math.min(M.cap, ([105, 115, 128, 140, 152, 164, 176][i] + k * 14) * M.speed),   // fall speed
+    gap:    Math.max(0.36, ([1.15, 1.05, 1.0, 0.95, 0.9, 0.85, 0.8][i] - k * 0.04) * M.gap),  // seconds between drops
+    det:    dl < 0 ? 0 : Math.min(0.42, ([0.11, 0.14, 0.17, 0.18, 0.16, 0.15][Math.min(dl, 5)] + Math.max(0, dl - 5) * 0.02) * M.foe),
+    pair:   dl < 2 - g ? 0 : dl < 4 - g ? 0.18 : Math.min(0.5, 0.28 + k * 0.04 + g * 0.05),
+    triple: dl < 6 - 2 * g ? 0 : Math.min(0.3, 0.06 + k * 0.03 + g * 0.03),
+    amp:    since('amp') < 0 ? 0 : (0.06 + Math.min(0.05, since('amp') * 0.01)) * M.foe * M.poly,
+    sma:    since('sma') < 0 ? 0 : (0.05 + Math.min(0.04, since('sma') * 0.008)) * M.foe * M.poly,
+    drug:   since('drug') < 0 ? 0 : (0.03 + Math.min(0.025, since('drug') * 0.005)) * M.foe,
+    nd:     since('nd') < 0 ? 0 : 0.03,
+    mem:    ['chol', 'pip', 'gm3'].filter(key => since(key) >= 0),
+    stay:   Math.max(1.6, 4.4 - (L - 2) * 0.3 + M.stay),                           // how long membrane lipids linger
+    memGap: since('gm3') < 0 ? [3.5, 5.5] : [4.5, 7.5]
+  };
+  // never let baddies crowd out the solutes entirely
+  const foes = c.det + c.amp + c.sma + c.drug;
+  if (foes > M.ceil) for (const key of ['det', 'amp', 'sma', 'drug']) c[key] *= M.ceil / foes;
+  return c;
+}
+const BANDS = [-30, 26, 80];
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = s => document.querySelector(s);
+const stage = $('#stage'), cv = $('#game'), ctx = cv.getContext('2d');
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const lerpAng = (a, b, t) => { const d = ((b - a + PI) % TAU + TAU) % TAU - PI; return a + d * t; };
+const rnd = (a, b) => a + Math.random() * (b - a);
+const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+let W = 960, H = 600, scale = 1, ox = 0, oy = 0, dpr = 1, MC = 430, HY = 272;
+const MAXV = 560, HEAD_R = 80;
+const P = { x:480, tx:480, vx:0, phase:0, catchT:0, hurtT:0, blinkIn:2.5, blink:0,
+  lookX:0, lookY:0, worry:0, aL:-0.3, aR:-0.3, hy:272, bounce:0, lift:0, hands:[{x:0,y:0},{x:0,y:0}] };
+const G = { mode:'menu', score:0, combo:0, solutes:0, ions:0, t:0, level:1, levelT:0, banner:null, spawnIn:1, shield:0, boost:0, memIn:5, plug:0, plugA:1, plugFx:0, plugFy:0, plugAng:0, blockMsgT:0, snapT:0,
+  push:0, gap:1, instab:0, best:0, shake:0 };
+let items = [], parts = [], texts = [], lipU = [], lipL = [], water = [], inserted = [], attached = [], flyers = [], holes = [];
+let cargo = [], released = [], memItems = [];
+let time = 0, last = performance.now(), inputMode = 'none';
+const keys = { l:false, r:false };
+
+// Ten detergent binding sites down the two transmembrane helices (left/right, staggered)
+const SLOTS = [];
+for (let i = 0; i < 5; i++) { SLOTS.push({ side:-1, dy:-60 + i * 36 }); SLOTS.push({ side:1, dy:-42 + i * 36 }); }
+
+G.diff = 'easy';
+const bests = { easy: 0, medium: 0, hard: 0 };
+try {
+  for (const k in bests) bests[k] = parseInt(localStorage.getItem('dgs-best-' + k) || '0', 10) || 0;
+  const d = localStorage.getItem('dgs-diff'); if (MODES[d]) G.diff = d;
+} catch (e) {}
+
+/* ---------- sizing ---------- */
+function resize() {
+  const r = stage.getBoundingClientRect();
+  if (r.width < 10 || r.height < 10) return;
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(r.width * dpr);
+  cv.height = Math.round(r.height * dpr);
+  const a = r.width / r.height;
+  if (a >= 640 / 600) { H = 600; W = Math.min(600 * a, 1500); }
+  else { W = 640; H = Math.min(640 / a, 1250); }
+  scale = Math.min(r.width / W, r.height / H);
+  ox = (r.width - W * scale) / 2; oy = (r.height - H * scale) / 2;
+  MC = H - 170; HY = MC - 158;
+  P.x = clamp(P.x, 120, W - 120); P.tx = clamp(P.tx, 120, W - 120);
+  buildLipids(); buildWater();
+}
+function pushX(bx) {
+  const d = bx - P.x, ad = Math.abs(d), R = (74 + G.push) * G.gap;
+  return P.x + (d >= 0 ? 1 : -1) * (ad + R * Math.exp(-ad / 285));
+}
+function mkLip(bx, i, leaf) {
+  const f = hash(i * 1.7 + leaf * 9.1), g = hash(i * 4.3 + leaf * 2.2 + 5);
+  return { bx, x: pushX(bx), face: f < .3 ? 0 : f < .5 ? 1 : f < .68 ? 2 : f < .85 ? 3 : 4, ph: g * TAU,
+    jump: 0, delay: 0, tilt: hash(i * 5.1 + leaf * 3.3) - 0.5, thr: hash(i * 8.7 + leaf * 1.3 + 2) };
+}
+function buildLipids() {
+  const sp = 46, n = Math.ceil(W / sp) + 8;
+  lipU = []; lipL = [];
+  for (let i = 0; i < n; i++) {
+    const bx = (i - 4) * sp + sp * 0.5;
+    lipU.push(mkLip(bx, i, 0)); lipL.push(mkLip(bx + 12, i, 1));
+  }
+}
+function buildWater() {
+  water = [];
+  const n = Math.round(W * H / 15000);
+  for (let i = 0; i < n; i++) water.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1.5, 3.2), vx: rnd(-8, 8), vy: rnd(-8, 8) });
+}
+
+/* ---------- sound ---------- */
+// Cartoon synth: everything is generated live with Web Audio (oscillators + filtered noise), no files to load
+let actx = null, master = null, noiseBuf = null, muted = false, lastSlurp = -1;
+try { muted = localStorage.getItem('dgs-muted') === '1'; } catch (e) {}
+function audio() {
+  if (muted) return null;
+  try {
+    if (!actx) {
+      const A = window.AudioContext || window.webkitAudioContext; if (!A) return null;
+      actx = new A();
+      const comp = actx.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.ratio.value = 4;
+      master = actx.createGain(); master.gain.value = 0.8;
+      master.connect(comp).connect(actx.destination);
+      noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (actx.state === 'suspended') actx.resume();
+    return actx;
+  } catch (e) { return null; }
+}
+function env(g, t, a, peak, d) {
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+}
+function osc(type, f0, f1, dur, vol, delay = 0, o = {}) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay, src = a.createOscillator(), g = a.createGain();
+  src.type = type;
+  src.frequency.setValueAtTime(f0, t);
+  if (f1 !== f0) src.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  if (o.vib) {
+    const l = a.createOscillator(), lg = a.createGain();
+    l.frequency.value = o.vib; lg.gain.value = o.vibDepth || f0 * 0.03;
+    l.connect(lg).connect(src.frequency); l.start(t); l.stop(t + dur + 0.1);
+  }
+  let node = src;
+  if (o.lp) { const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; f.Q.value = o.q || 1; src.connect(f); node = f; }
+  env(g, t, o.a || 0.006, vol, dur);
+  node.connect(g).connect(master);
+  src.start(t); src.stop(t + dur + 0.1);
+}
+function noise(dur, vol, delay = 0, type = 'bandpass', f0 = 1000, f1 = f0, q = 1) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = noiseBuf;
+  f.type = type; f.frequency.setValueAtTime(f0, t);
+  if (f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  f.Q.value = q;
+  env(g, t, 0.004, vol, dur);
+  s.connect(f).connect(g).connect(master);
+  s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.1);
+}
+const SFX = {
+  // good stuff
+  catch: () => { osc('sine', 440, 140, 0.15, 0.24); osc('sine', 1000, 1400, 0.04, 0.05); },           // gulp
+  slurp: () => osc('sine', 650, 170, 0.32, 0.07, 0, { vib: 20, vibDepth: 45 }),                        // down the channel
+  deliver: () => { osc('sine', 680, 1050, 0.07, 0.16); osc('triangle', 1320, 1320, 0.14, 0.07, 0.06); noise(0.04, 0.04, 0, 'highpass', 4000); },
+  combo: m => [0, 4, 7, 12, 16].slice(0, m + 1).forEach((s, i) => osc('triangle', 523 * 2 ** (s / 12), 523 * 2 ** (s / 12), 0.12, 0.08, i * 0.06)),
+  thwack: () => { noise(0.07, 0.3, 0, 'lowpass', 2600, 500); osc('sine', 260, 70, 0.14, 0.22); noise(0.28, 0.07, 0.05, 'bandpass', 500, 2600, 1.2); },
+  chol: () => { osc('triangle', 660, 660, 0.12, 0.08); osc('triangle', 990, 990, 0.16, 0.07, 0.08); },
+  pip: () => { SFX.thwack(); SFX.sparkle(0.1); },
+  sparkle: (d = 0) => [784, 988, 1175, 1568].forEach((f, i) => osc('triangle', f, f, 0.1, 0.06, d + i * 0.05)),
+  shield: () => [523, 659, 784, 1047, 1319].forEach((f, i) => osc('sine', f, f * 1.004, 0.7, 0.05, i * 0.05, { vib: 6, vibDepth: 5 })),
+  block: () => { osc('triangle', 1760, 1700, 0.28, 0.09); osc('sine', 2637, 2600, 0.2, 0.04); },
+  shieldWarn: () => osc('sine', 880, 880, 0.06, 0.06),
+  shieldOff: () => [1047, 784, 523].forEach((f, i) => osc('sine', f, f, 0.12, 0.05, i * 0.06)),
+  gm3: () => { [659, 831, 988, 1319].forEach((f, i) => osc('square', f, f, 0.1, 0.045, i * 0.055, { lp: 3000 })); osc('sine', 1319, 1319, 0.5, 0.05, 0.22, { vib: 7, vibDepth: 8 }); },
+  lipidIn: () => { osc('sine', 330, 440, 0.09, 0.07); osc('sine', 440, 587, 0.1, 0.06, 0.1); },
+  lipidOut: () => osc('sine', 587, 330, 0.18, 0.05),
+  plug: () => { osc('sine', 1100, 320, 0.14, 0.11); osc('sine', 130, 55, 0.25, 0.28, 0.08); noise(0.06, 0.18, 0.08, 'lowpass', 900, 300); },   // squeak + thunk
+  unplug: () => { osc('sine', 260, 1300, 0.07, 0.22); noise(0.05, 0.2, 0, 'bandpass', 3200, 2000, 2); },                                       // cork pop
+  bonk: () => { osc('square', 230, 150, 0.1, 0.07, 0, { lp: 1100 }); osc('triangle', 190, 120, 0.12, 0.07); },
+  // baddies
+  snap: () => noise(0.03, 0.05, 0, 'bandpass', 2400, 1500, 3),                                          // jaws nearby
+  chomp: () => { for (const d of [0, 0.1]) { noise(0.05, 0.28, d, 'bandpass', 1900, 900, 2); osc('square', 180, 85, 0.06, 0.12, d, { lp: 900 }); } },
+  wrap: () => { osc('sawtooth', 150, 330, 0.26, 0.1, 0, { lp: 1200, vib: 24, vibDepth: 30 }); osc('sine', 330, 110, 0.3, 0.12, 0.16); },
+  clank: () => { osc('square', 620, 600, 0.2, 0.07, 0, { lp: 3200 }); osc('square', 931, 900, 0.18, 0.05, 0, { lp: 3200 }); noise(0.06, 0.12, 0, 'highpass', 2500); osc('sine', 120, 55, 0.28, 0.16); },
+  squelch: () => { noise(0.2, 0.09, 0, 'lowpass', 1300, 200, 5); osc('sine', 210, 90, 0.18, 0.06); },
+  hole: () => { noise(0.45, 0.24, 0, 'bandpass', 3200, 280, 1.4); osc('sawtooth', 200, 45, 0.4, 0.06, 0, { lp: 800 }); osc('sine', 480, 900, 0.1, 0.08, 0.45); },
+  // game flow
+  level: () => [392, 523, 659, 784].forEach((f, i) => osc('square', f, f, i === 3 ? 0.45 : 0.12, 0.05, i * 0.11, { lp: 2400 })),
+  start: () => [392, 523, 659].forEach((f, i) => osc('triangle', f, f, 0.1, 0.08, i * 0.07)),
+  over: () => [[311, 0.3], [294, 0.3], [277, 0.3], [262, 1.0]].forEach(([f, d], i) =>
+    osc('sawtooth', f, i === 3 ? f * 0.97 : f, d, 0.09, i * 0.36, { lp: 900, a: 0.03, vib: i === 3 ? 5.5 : 0, vibDepth: 7 })),  // sad trombone
+};
+function sfx(k, arg) { if (muted || !SFX[k]) return; try { SFX[k](arg); } catch (e) {} }
+
+/* ---------- shared drawing helpers ---------- */
+function dot(g, x, y, r) { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+function arcS(g, cx, cy, r, a0, a1) { g.moveTo(cx + r * Math.cos(a0), cy + r * Math.sin(a0)); g.arc(cx, cy, r, a0, a1); }
+function hexAt(g, x, y, r, rot) { g.beginPath(); for (let i = 0; i < 6; i++) { const a = rot + i * PI / 3; g[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * r, y + Math.sin(a) * r); } g.closePath(); }
+
+function drawLigand(g, x, y, rot, s) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.lineCap = 'round'; g.lineJoin = 'round';
+  const p1 = [Math.cos(rot) * 17, Math.sin(rot) * 17], p2 = [Math.cos(rot + 2.4) * 16, Math.sin(rot + 2.4) * 16];
+  g.strokeStyle = C.ink; g.lineWidth = 3.2;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(p1[0], p1[1]); g.moveTo(0, 0); g.lineTo(p2[0], p2[1]); g.stroke();
+  g.lineWidth = 2;
+  g.fillStyle = C.oxy; g.beginPath(); g.arc(p1[0], p1[1], 6, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = C.white; g.beginPath(); g.arc(p2[0], p2[1], 5, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = C.lig; g.lineWidth = 2.4; g.beginPath(); g.arc(0, 0, 11, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = C.ink; dot(g, -3.8, -2, 1.6); dot(g, 3.8, -2, 1.6);
+  g.lineWidth = 1.8; g.beginPath(); arcS(g, 0, 1, 4.6, 0.15 * PI, 0.85 * PI); g.stroke();
+  g.restore();
+}
+function drawIon(g, x, y, kind, s) {
+  const r = kind === 'cl' ? 12 : 10.5;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.fillStyle = C[kind]; g.strokeStyle = C.ink; g.lineWidth = 2.2;
+  g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = C.ink; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '13px "Patrick Hand", "Comic Sans MS", cursive';
+  g.fillText(kind === 'na' ? 'Na⁺' : 'Cl⁻', 0, 0.5);
+  g.restore();
+}
+function drawCargo(g, kind, x, y, rot, s) { if (kind === 'lig') drawLigand(g, x, y, rot, s); else drawIon(g, x, y, kind, s); }
+// flip = lower-leaflet pose: inositol headgroup down in the cytoplasm, tails pointing up into the bilayer
+function drawPIP(g, x, y, rot, s, flip = false) {
+  const dir = flip ? -1 : 1;
+  g.save(); g.translate(x, y); g.scale(s, s); g.rotate(Math.sin(rot) * (flip ? 0.1 : 0.35)); g.translate(0, -10 * dir);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const w = Math.sin(rot * 2) * 2;
+  g.strokeStyle = C.tail; g.lineWidth = 2.6;
+  g.beginPath();
+  g.moveTo(-4, 10 * dir); g.quadraticCurveTo(-4 + w, 24 * dir, -6 - w, 38 * dir);
+  g.moveTo(4, 10 * dir); g.quadraticCurveTo(4 + w, 24 * dir, 6 - w, 38 * dir);
+  g.stroke();
+  g.strokeStyle = C.ink; g.lineWidth = 2.2; g.fillStyle = C.pip;
+  hexAt(g, 0, 0, 13, -PI / 2); g.fill(); g.stroke();
+  g.fillStyle = C.pipP;
+  for (const sx of [-1, 1]) { g.beginPath(); g.arc(sx * 15, -9 * dir, 5.5, 0, TAU); g.fill(); g.stroke(); }
+  g.fillStyle = C.ink; dot(g, -4, -1, 1.5); dot(g, 4, -1, 1.5);
+  g.lineWidth = 1.7; g.beginPath(); arcS(g, 0, 2, 4, 0.15 * PI, 0.85 * PI); g.stroke();
+  g.restore();
+}
+function drawChol(g, x, y, rot, s) {
+  const a = 9;
+  g.save(); g.translate(x, y); g.rotate(rot); g.scale(s, s); g.translate(-0.75 * a, -0.9 * a);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.strokeStyle = C.ink; g.lineWidth = 2.2;
+  g.beginPath();
+  g.moveTo(1.5 * a, 3.3 * a); g.lineTo(1.0 * a, 4.1 * a); g.lineTo(1.6 * a, 4.9 * a); g.lineTo(1.1 * a, 5.8 * a); g.lineTo(1.7 * a, 6.6 * a);
+  g.moveTo(1.1 * a, 5.8 * a); g.lineTo(0.4 * a, 6.2 * a);
+  g.stroke();
+  g.fillStyle = C.chol;
+  for (const [cx, cy] of [[0, 0], [1.5 * a, 0.866 * a], [0, 1.732 * a]]) { hexAt(g, cx, cy, a, 0); g.fill(); g.stroke(); }
+  g.beginPath();
+  for (let i = 0; i < 5; i++) { const t = -PI / 2 + i * TAU / 5; g[i ? 'lineTo' : 'moveTo'](1.5 * a + Math.cos(t) * 0.85 * a, 2.55 * a + Math.sin(t) * 0.85 * a); }
+  g.closePath(); g.fill(); g.stroke();
+  g.lineWidth = 1.6;
+  for (const [cx, cy] of [[0, 0], [0, 1.732 * a]]) {
+    g.fillStyle = C.white; g.beginPath(); g.arc(cx, cy, 0.42 * a, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = C.ink; dot(g, cx + 0.08 * a, cy, 0.16 * a);
+  }
+  g.restore();
+}
+// Drug capsule (navy/white) with an upright cross face on the white half
+function drawDrug(g, x, y, ang, s, t) {
+  const L = 16, R = 9.5, c = L - R;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.save(); g.rotate(ang);
+  g.fillStyle = C.drug;
+  g.beginPath(); g.moveTo(0, -R); g.lineTo(-c, -R); g.arc(-c, 0, R, -PI / 2, PI / 2, true); g.lineTo(0, R); g.closePath(); g.fill();
+  g.fillStyle = C.white;
+  g.beginPath(); g.moveTo(0, -R); g.lineTo(c, -R); g.arc(c, 0, R, -PI / 2, PI / 2); g.lineTo(0, R); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 2.2; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(-c - 2, -R + 3.5); g.lineTo(-2.5, -R + 3.5); g.stroke();
+  g.strokeStyle = C.ink; g.lineWidth = 2.6; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(-c, -R); g.lineTo(c, -R); g.arc(c, 0, R, -PI / 2, PI / 2); g.lineTo(-c, R); g.arc(-c, 0, R, PI / 2, 3 * PI / 2); g.closePath(); g.stroke();
+  g.lineWidth = 2; g.beginPath(); g.moveTo(0, -R); g.lineTo(0, R); g.stroke();
+  g.restore();
+  const fx = Math.cos(ang) * 8.5, fy = Math.sin(ang) * 8.5;
+  g.fillStyle = C.ink; g.strokeStyle = C.ink; g.lineCap = 'round';
+  dot(g, fx - 3, fy - 1, 1.5); dot(g, fx + 3, fy - 1, 1.5);
+  g.lineWidth = 1.6;
+  g.beginPath(); g.moveTo(fx - 5.6, fy - 5.2); g.lineTo(fx - 1.4, fy - 3.2); g.moveTo(fx + 5.6, fy - 5.2); g.lineTo(fx + 1.4, fy - 3.2); g.stroke();
+  g.lineWidth = 1.3;
+  g.strokeRect(fx - 3.6, fy + 2, 7.2, 3.2);
+  g.beginPath(); g.moveTo(fx - 1.2, fy + 2); g.lineTo(fx - 1.2, fy + 5.2); g.moveTo(fx + 1.2, fy + 2); g.lineTo(fx + 1.2, fy + 5.2); g.stroke();
+  g.restore();
+}
+// GM3 ganglioside, SNFG symbols: Neu5Ac (purple diamond) – Gal (yellow circle) – Glc (blue circle) – ceramide
+function drawGM3(g, x, y, s, t, tl = 58) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.rotate(Math.sin(t * 1.7) * 0.06);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const w = Math.sin(t * 2.2) * 2.5;
+  g.strokeStyle = C.tail; g.lineWidth = 2.6;
+  g.beginPath();
+  for (const o of [-5, 5]) { g.moveTo(o, 8); g.quadraticCurveTo(o + w, 8 + tl * 0.4, o * 1.15 - w * 0.6, 8 + tl * 0.86); }
+  g.stroke();
+  g.strokeStyle = C.ink; g.lineWidth = 2.4;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -22); g.lineTo(13, -40); g.stroke();
+  g.lineWidth = 2;
+  g.fillStyle = C.glc; g.beginPath(); g.arc(0, 0, 9.5, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = C.gal; g.beginPath(); g.arc(0, -22, 9, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = C.sia; g.beginPath(); g.moveTo(13, -51); g.lineTo(24, -40); g.lineTo(13, -29); g.lineTo(2, -40); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = C.white; dot(g, -3.3, -1.5, 1.5); dot(g, 3.3, -1.5, 1.5);
+  g.strokeStyle = C.white; g.lineWidth = 1.5; g.beginPath(); arcS(g, 0, 0.5, 3.6, 0.15 * PI, 0.85 * PI); g.stroke();
+  g.restore();
+}
+function drawNanodisc(g, x, y, rot, s) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.rotate(Math.sin(rot) * 0.25);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.strokeStyle = C.tail; g.lineWidth = 1.8;
+  g.beginPath();
+  for (const i of [-8, 0, 8]) for (const o of [-1.6, 1.6]) { g.moveTo(i + o, -5); g.lineTo(i + o, -0.8); g.moveTo(i + o, 0.8); g.lineTo(i + o, 5); }
+  g.stroke();
+  g.fillStyle = C.lipid; g.strokeStyle = C.ink; g.lineWidth = 1.5;
+  for (const i of [-8, 0, 8]) for (const yy of [-8.5, 8.5]) { g.beginPath(); g.arc(i, yy, 4.2, 0, TAU); g.fill(); g.stroke(); }
+  for (const sx of [-1, 1]) {
+    const bx = sx * 17;
+    g.fillStyle = C.msp; g.lineWidth = 2;
+    g.beginPath(); g.roundRect ? g.roundRect(bx - 4.5, -14, 9, 28, 4.5) : g.rect(bx - 4.5, -14, 9, 28); g.fill(); g.stroke();
+    g.strokeStyle = C.mspD; g.lineWidth = 1.6;
+    g.beginPath(); for (let k = -10; k <= 8; k += 6) { g.moveTo(bx - 3.5, k); g.lineTo(bx + 3.5, k + 4); } g.stroke();
+    g.strokeStyle = C.ink;
+  }
+  g.restore();
+}
+// A baddie head in its own frame (+x = forward): purple/pink/grey disc, beady eye, chomping jaws with white teeth
+function jawHead(g, R, fill, t) {
+  const k = R / 13.5;
+  g.fillStyle = fill; g.strokeStyle = C.ink; g.lineWidth = 2.8;
+  g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill(); g.stroke();
+  const ch = Math.sin(t * 10) * 0.5 + 0.5, mid = 0.62, half = 0.3 + ch * 0.2, RR = R + 0.9;
+  const Cx = -0.5 * k, Cy = 4.5 * k;
+  const U = [Math.cos(mid - half) * RR, Math.sin(mid - half) * RR], D = [Math.cos(mid + half) * RR, Math.sin(mid + half) * RR];
+  g.fillStyle = C.ink;
+  g.beginPath(); g.moveTo(Cx, Cy); g.lineTo(U[0], U[1]); g.arc(0, 0, RR, mid - half, mid + half); g.closePath(); g.fill();
+  const teeth = (P1, toward) => {
+    const dx = P1[0] - Cx, dy = P1[1] - Cy, len = Math.hypot(dx, dy);
+    let nx = -dy / len, ny = dx / len;
+    if (nx * (toward[0] - Cx) + ny * (toward[1] - Cy) < 0) { nx = -nx; ny = -ny; }
+    g.beginPath();
+    for (const f of [0.34, 0.6, 0.86]) {
+      g.moveTo(Cx + dx * (f - 0.12), Cy + dy * (f - 0.12));
+      g.lineTo(Cx + dx * f + nx * 3.1 * k, Cy + dy * f + ny * 3.1 * k);
+      g.lineTo(Cx + dx * (f + 0.12), Cy + dy * (f + 0.12));
+      g.closePath();
+    }
+    g.fill();
+  };
+  g.fillStyle = C.white;
+  teeth(U, D); teeth(D, U);
+  g.fillStyle = C.ink; dot(g, 3 * k, -5.4 * k, 2.4 * k);
+  g.fillStyle = C.white; dot(g, 3.7 * k, -6.2 * k, 0.8 * k);
+}
+function headFrame(g, x, y, hd) { g.translate(x, y); g.rotate(hd); if (Math.cos(hd) < 0) g.scale(1, -1); }
+function drawDetergent(g, x, y, hd, s, t) {
+  g.save(); g.translate(x, y); g.scale(s, s); headFrame(g, 0, 0, hd);
+  g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = C.ink;
+  const L = 54, N = 20;
+  const pt = u => [-12 - u * L, -4 - u * 6 + Math.sin(u * TAU * 0.85 - t * 5) * (1 + u * 7)];
+  let prev = pt(0);
+  for (let i = 1; i <= N; i++) {
+    const u = i / N, p = pt(u);
+    g.lineWidth = lerp(3.6, 0.9, u);
+    g.beginPath(); g.moveTo(prev[0], prev[1]); g.lineTo(p[0], p[1]); g.stroke();
+    prev = p;
+  }
+  jawHead(g, 13.5, C.det, t);
+  g.restore();
+}
+function segs(pts, fn) {
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], dx = x1 - x0, dy = y1 - y0, m = Math.hypot(dx, dy) || 1;
+    fn(i, (x0 + x1) / 2, (y0 + y1) / 2, -dy / m, dx / m, dx / m, dy / m);
+  }
+}
+function backbone(g, pts) {
+  g.strokeStyle = C.ink; g.lineWidth = 3.4;
+  g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke();
+}
+// Amphipol: polymer backbone with alternating octyl tails and carboxylate beads
+function drawAmphipol(g, pts, hd, t) {
+  g.save(); g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = C.ink;
+  segs(pts, (i, mx, my, nx, ny) => {
+    if (i % 2) {
+      g.lineWidth = 2; g.beginPath(); g.moveTo(mx, my);
+      g.quadraticCurveTo(mx + nx * 7, my + ny * 7, mx + nx * 13 + Math.sin(t * 6 + i) * 2, my + ny * 13 + Math.cos(t * 6 + i) * 2); g.stroke();
+    } else {
+      g.lineWidth = 1.8; g.beginPath(); g.moveTo(mx, my); g.lineTo(mx - nx * 5, my - ny * 5); g.stroke();
+      g.fillStyle = C.amp; g.beginPath(); g.arc(mx - nx * 8.5, my - ny * 8.5, 3.8, 0, TAU); g.fill(); g.stroke();
+    }
+  });
+  backbone(g, pts);
+  headFrame(g, pts[0][0], pts[0][1], hd); jawHead(g, 12, C.amp, t);
+  g.restore();
+}
+// SMA: polymer backbone with alternating styrene rings and maleic acid pairs
+function drawSMA(g, pts, hd, t, noHead) {
+  g.save(); g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = C.ink;
+  segs(pts, (i, mx, my, nx, ny, tx, ty) => {
+    if (i % 2) {
+      g.lineWidth = 1.8; g.beginPath(); g.moveTo(mx, my); g.lineTo(mx + nx * 5.5, my + ny * 5.5); g.stroke();
+      g.fillStyle = C.white; hexAt(g, mx + nx * 10.5, my + ny * 10.5, 5.2, i); g.fill(); g.stroke();
+      g.lineWidth = 1.2; g.beginPath(); g.arc(mx + nx * 10.5, my + ny * 10.5, 2.3, 0, TAU); g.stroke();
+    } else {
+      g.fillStyle = C.oxy; g.lineWidth = 1.3;
+      for (const sgn of [-1, 1]) { g.beginPath(); g.arc(mx - nx * 6 + tx * sgn * 3, my - ny * 6 + ty * sgn * 3, 2.7, 0, TAU); g.fill(); g.stroke(); }
+    }
+  });
+  backbone(g, pts);
+  if (!noHead) { headFrame(g, pts[0][0], pts[0][1], hd); jawHead(g, 12.5, C.sma, t); }
+  g.restore();
+}
+function drawSMALP(g, x, y, t) {
+  g.save(); g.translate(x, y); g.rotate(Math.sin(t * 1.3) * 0.12);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.strokeStyle = C.tail; g.lineWidth = 2;
+  g.beginPath(); for (const i of [-10, 0, 10]) { g.moveTo(i, -6); g.lineTo(i, -1); g.moveTo(i, 1); g.lineTo(i, 6); } g.stroke();
+  g.fillStyle = C.lipid; g.strokeStyle = C.ink; g.lineWidth = 1.5;
+  for (const i of [-10, 0, 10]) for (const yy of [-10, 10]) { g.beginPath(); g.arc(i, yy, 5, 0, TAU); g.fill(); g.stroke(); }
+  g.lineWidth = 5; g.beginPath(); g.ellipse(0, 0, 24, 18, 0, 0, TAU); g.stroke();
+  g.strokeStyle = C.sma; g.lineWidth = 2.6; g.beginPath(); g.ellipse(0, 0, 24, 18, 0, 0, TAU); g.stroke();
+  g.strokeStyle = C.ink; g.fillStyle = C.white; g.lineWidth = 1.4;
+  for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + t * 0.6; hexAt(g, Math.cos(a) * 24, Math.sin(a) * 18, 4.2, a); g.fill(); g.stroke(); }
+  g.restore();
+}
+
+/* ---------- membrane ---------- */
+function hwNow(h) { return h.hw * clamp(h.life / 1.5, 0, 1) * clamp((h.max - h.life) / 0.3, 0, 1); }
+function bob(l, dir) { return Math.sin(time * 1.6 + l.ph) * 1.4 + dir * Math.sin(clamp(l.jump, 0, 1) * PI) * 9; }
+function ripple(x, leaf) {
+  const k = G.instab;
+  return k > 0.01 ? (Math.sin(x / 115 + time * 2.2) * 13 + Math.sin(x / 43 - time * 3.3 + leaf * 1.9) * 5) * k : 0;
+}
+function tails(dir, l, k) {
+  const sp = 2.2 + k * 4, w = Math.sin(time * sp + l.ph) * (2.5 + k * 7), len = 62 - k * 8;
+  ctx.beginPath();
+  for (const o of [-5, 5]) {
+    const w2 = w + (k > 0.01 ? Math.sin(time * sp * 1.3 + l.ph + o) * k * 5 : 0);
+    ctx.moveTo(o, dir * 15);
+    ctx.quadraticCurveTo(o + w2, dir * 36, o * 1.15 - w2 * 0.6, dir * len);
+  }
+  ctx.stroke();
+}
+function lipHead(x, y, l, sad, rot) {
+  const e = clamp((P.x - x) / 220, -1, 1) * 1.8;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+  ctx.fillStyle = C.lipid; ctx.strokeStyle = C.ink; ctx.lineWidth = 2.3;
+  ctx.beginPath(); ctx.arc(0, 0, 17, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = C.ink; ctx.lineWidth = 1.9;
+  const oval = (x0) => { ctx.beginPath(); ctx.ellipse(x0 + e, -3, 2, 3.2, 0, 0, TAU); ctx.fill(); };
+  const smile = (r = 7, y0 = 1) => { ctx.beginPath(); arcS(ctx, e, y0, r, 0.18 * PI, 0.82 * PI); ctx.stroke(); };
+  const glasses = () => {
+    ctx.beginPath(); arcS(ctx, -6.5 + e, -3, 4.8, 0, TAU); arcS(ctx, 6.5 + e, -3, 4.8, 0, TAU);
+    ctx.moveTo(-1.7 + e, -3); ctx.lineTo(1.7 + e, -3); ctx.stroke();
+    dot(ctx, -6.5 + e * 1.4, -3, 1.6); dot(ctx, 6.5 + e * 1.4, -3, 1.6);
+  };
+  if (sad) {
+    if (l.face === 1) glasses(); else { oval(-6); oval(6); }
+    ctx.beginPath(); arcS(ctx, e, 10, 6, 1.15 * PI, 1.85 * PI); ctx.stroke();
+    ctx.restore(); return;
+  }
+  const happy = l.jump > 0.05 && l.delay <= 0;
+  switch (happy ? 2 : l.face) {
+    case 0: oval(-6); oval(6); smile(); break;
+    case 1: glasses(); smile(5, 4); break;
+    case 2:
+      ctx.beginPath(); arcS(ctx, -6 + e, -1, 3.3, 1.1 * PI, 1.9 * PI); arcS(ctx, 6 + e, -1, 3.3, 1.1 * PI, 1.9 * PI); ctx.stroke();
+      smile(8, 1); break;
+    case 3: oval(-6); oval(6); ctx.beginPath(); ctx.arc(e, 3, 6, 0, PI); ctx.closePath(); ctx.fill(); break;
+    default:
+      oval(-6); ctx.beginPath(); arcS(ctx, 6 + e, -1, 3.3, 1.1 * PI, 1.9 * PI); ctx.stroke(); smile(); break;
+  }
+  ctx.restore();
+}
+function drawLipids() {
+  const k = G.instab;
+  // Each lipid's pose: bound baddies make the bilayer ripple, tilt, thin and shed lipids; SMA holes open pores with curled rims
+  const poses = [];
+  for (const [L, base, dir, leaf] of [[lipU, MC - 70, -1, 0], [lipL, MC + 70, 1, 1]]) {
+    for (const l of L) {
+      let hidden = false, rimRot = 0, rimDy = 0;
+      for (const h of holes) {
+        const hw = hwNow(h); if (hw < 1) continue;
+        const dx = l.x - h.x, ad = Math.abs(dx);
+        if (ad < hw) { hidden = true; break; }
+        const f = clamp(1 - (ad - hw) / 45, 0, 1);
+        if (f > 0) { const sg = dx > 0 ? 1 : -1; rimRot += (leaf === 0 ? -sg : sg) * 0.8 * f; rimDy += -dir * f * 16; }
+      }
+      if (hidden) continue;
+      const near = clamp(1.4 - Math.abs(l.x - P.x) / 400, 0, 1);
+      const peel = clamp((k - 0.4 - l.thr * 0.9) * 4, 0, 1) * near;
+      const jit = k > 0.01 ? Math.sin(time * 9 + l.ph * 3) * 2.5 * k : 0;
+      const y = base + bob(l, dir) + ripple(l.x, leaf) + dir * peel * 32 + jit + rimDy;
+      const rot = (l.tilt * 0.9 + Math.sin(time * 2.5 + l.ph) * 0.3) * k + peel * l.tilt * 1.8 + rimRot;
+      poses.push({ l, x: l.x, y, rot, tdir: -dir });
+    }
+  }
+  ctx.strokeStyle = C.tail; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+  for (const q of poses) { ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); tails(q.tdir, q.l, k); ctx.restore(); }
+  const foes = items.filter(it => (it.type === 'det' || it.type === 'amp' || it.type === 'sma') && it.y > MC - 300);
+  const sadAt = (x, y) => {
+    if (k > 0.75) return true;
+    if (k > 0.4 && Math.abs(x - P.x) < 380) return true;
+    for (const h of holes) if (Math.abs(h.x - x) < hwNow(h) + 110) return true;
+    for (const d of inserted) if (d.life > 0.4 && Math.abs(d.x - x) < 85) return true;
+    for (const d of foes) if (Math.hypot(d.x - x, d.y - y) < 150) return true;
+    return false;
+  };
+  for (const q of poses) lipHead(q.x, q.y, q.l, sadAt(q.x, q.y), q.rot * 0.6);
+  for (const d of inserted) {
+    if (holes.some(h => Math.abs(h.x - d.x) < hwNow(h))) continue;
+    ctx.globalAlpha = clamp(d.life, 0, 1);
+    drawDetergent(ctx, d.x, MC - 38 + ripple(d.x, 0) + Math.sin(time * 1.5 + d.ph) * 1.5, -PI / 2, 0.9, time * 0.4 + d.ph);
+  }
+  ctx.globalAlpha = 1;
+  drawMem();
+}
+
+/* ---------- lipids that diffuse in through the bilayer ---------- */
+const memTotal = m => m.tin + m.stay + m.tout;
+function memY(m) {  // headgroup level of the item's leaflet
+  const up = m.leaf === 'up';
+  return (up ? MC - 70 : MC + 70) + ripple(m.x, up ? 0 : 1) + Math.sin(time * 1.6 + m.ph) * 1.4;
+}
+function drawMemItem(m, x, hy) {
+  const up = m.leaf === 'up', t = time + m.ph;
+  if (m.type === 'chol') drawChol(ctx, x, up ? hy + 22 : hy - 22, (up ? 0 : PI) + Math.sin(t) * 0.06, 0.85);
+  else if (m.type === 'pip') drawPIP(ctx, x, hy - 13, t, 1.3, true);
+  else drawGM3(ctx, x, hy, 1, t);
+}
+function memPush(x, leaf) {  // bilayer lipids part around an incoming lipid
+  let o = 0;
+  for (const m of memItems) {
+    if (m.leaf !== leaf) continue;
+    const d = x - m.x, ad = Math.abs(d);
+    if (ad < 150) o += (d >= 0 ? 1 : -1) * 28 * Math.exp(-ad / 30) * (m.a ?? 1);
+  }
+  return o;
+}
+function drawMem() {
+  for (const m of memItems) {
+    const hy = memY(m);
+    if (m.state === 'caught') {  // bound to the protein's side
+      ctx.globalAlpha = m.a;
+      drawMemItem(m, m.x, hy);
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    const col = MEM_COL[m.type], up = m.leaf === 'up';
+    const cy = hy + (m.type === 'chol' ? (up ? 28 : -28) : m.type === 'pip' ? -16 : -8);
+    ctx.globalAlpha = 0.2 + 0.08 * Math.sin(time * 6); ctx.fillStyle = col;
+    ctx.beginPath(); ctx.ellipse(m.x, cy, 27, 48, 0, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+    drawMemItem(m, m.x, hy);
+    // countdown on the water side of its leaflet; flashes as it starts to leave
+    const left = clamp(1 - m.t / memTotal(m), 0, 1), ry = up ? MC - 142 : MC + 116;
+    ctx.lineCap = 'round'; ctx.lineWidth = 4;
+    ctx.globalAlpha = 0.15; ctx.strokeStyle = C.ink;
+    ctx.beginPath(); ctx.arc(m.x, ry, 9, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = left < 0.3 && Math.floor(time * 8) % 2 ? C.ink : col;
+    ctx.beginPath(); ctx.arc(m.x, ry, 9, -PI / 2, -PI / 2 + TAU * left); ctx.stroke();
+  }
+}
+function spawnMem() {
+  const c = cfg(G.level), types = c.mem;
+  if (!types.length) return;
+  // the newest lipid shows up more often on the level that introduces it
+  const pick = types.length === 1 ? types[0] : (Math.random() < 0.4 && G.level <= 4 ? types[types.length - 1] : types[Math.floor(Math.random() * types.length)]);
+  const type = pick, d = clamp((G.level - 2) / 6, 0, 1);
+  const leaf = type === 'pip' ? 'low' : type === 'gm3' ? 'up' : (Math.random() < 0.5 ? 'up' : 'low');
+  // come in from the side away from the protein, so you have to go and get it
+  const fromLeft = P.x > W / 2;
+  let tx = fromLeft ? rnd(130, W / 2) : rnd(W / 2, W - 130);
+  if (Math.abs(tx - P.x) < 200) tx = clamp(P.x + (fromLeft ? -200 : 200), 130, W - 130);
+  const sx = fromLeft ? -50 : W + 50;
+  memItems.push({ type, leaf, sx, tx, x: sx, t: 0, tin: lerp(1.4, 1.0, d), stay: c.stay, tout: lerp(1.3, 0.9, d), ph: rnd(0, TAU), state: 'in' });
+  sfx('lipidIn');
+}
+function catchMem(m) {
+  m.state = 'caught'; m.ct = 0; m.cx = m.x; m.a = 1;
+  // pick a free binding site beside the helices in this leaflet, nearest side first
+  const pref = m.x < P.x ? -1 : 1;
+  const taken = memItems.filter(o => o !== m && o.state === 'caught' && o.leaf === m.leaf && o.ct < BIND_S).map(o => o.side * o.off);
+  for (const off of [72, 102, 132, 162]) {
+    const s = [pref, -pref].find(sd => !taken.includes(sd * off));
+    if (s) { m.side = s; m.off = off; break; }
+  }
+  if (!m.side) { m.side = pref; m.off = 72; }
+  const bx = P.x, by = P.hy - 112;
+  burst(m.x, memY(m) + (m.leaf === 'up' ? 24 : -24), MEM_COL[m.type], 12, 130);
+  P.bounce = 1; cheer(P.x, 320);
+  if (m.type === 'chol') {
+    const k = knockOff(1);
+    if (k) say(bx, by, 'Cholesterol knocked one off', C.chol, 26); else { G.score += 50; say(bx, by, 'Cholesterol +50', C.chol, 26); }
+    sfx(k ? 'thwack' : 'chol');
+  } else if (m.type === 'pip') {
+    const u = G.plug > 0;
+    if (u) unplug();
+    const k = knockOff(2), bits = [];
+    if (u) bits.push('unplugged the pore');
+    if (k) bits.push(`knocked off ${k}`);
+    if (bits.length) say(bx, by, 'PIP₂ ' + bits.join(' & '), C.pip, u && k ? 24 : 26); else { G.score += 75; say(bx, by, 'PIP₂ +75', C.pip, 26); }
+    sfx(k ? 'pip' : 'sparkle');
+  } else {
+    G.boost = BOOST_S; G.score += 25;
+    say(bx, by, 'GM3: double points', C.sia, 28);
+    sfx('gm3');
+  }
+}
+function updateMem(dt, playing) {
+  if (playing) {
+    G.memIn -= dt;
+    if (G.memIn <= 0 && memItems.filter(m => m.state !== 'caught').length < 2) {
+      const c = cfg(G.level);
+      if (c.mem.length) { spawnMem(); G.memIn = rnd(c.memGap[0], c.memGap[1]); } else G.memIn = 1;
+    }
+  }
+  for (const m of memItems) {
+    if (m.state === 'caught') {
+      // slide onto the binding site, stay bound for BIND_S, then unbind and drift off
+      if (G.mode === 'over' && m.ct < BIND_S) m.ct = BIND_S;
+      m.ct += dt;
+      const site = P.x + m.side * m.off;
+      if (m.ct < BIND_S) {
+        const e = 1 - Math.pow(1 - clamp(m.ct / 0.35, 0, 1), 2);
+        m.x = lerp(m.cx, site, e) + (m.ct > 0.35 ? Math.sin(m.ct * 3 + m.ph) * 1.5 : 0);
+        m.a = 1;
+      } else {
+        const u = (m.ct - BIND_S) / 0.7;
+        m.x = site + m.side * u * 70;
+        m.a = clamp(1 - u, 0, 1);
+      }
+      continue;
+    }
+    m.t += dt;
+    const T1 = m.tin, T2 = T1 + m.stay, T3 = T2 + m.tout;
+    const jig = t => Math.sin((t - T1) * 2.3) * 9;
+    if (m.t < T1) m.x = lerp(m.sx, m.tx, 1 - Math.pow(1 - m.t / T1, 3));
+    else if (m.t < T2) m.x = m.tx + jig(m.t);
+    else {
+      if (m.state !== 'out') { m.state = 'out'; if (playing) sfx('lipidOut'); }
+      const u = (m.t - T2) / m.tout;
+      m.x = lerp(m.tx + jig(T2), m.sx, u * u);
+    }
+    if (m.t >= T3) m.gone = true;
+    else if (playing && Math.abs(m.x - P.x) < 76) catchMem(m);
+  }
+  memItems = memItems.filter(m => !m.gone && !(m.state === 'caught' && m.ct > BIND_S + 0.7));
+}
+
+/* ---------- protein ---------- */
+function drawHelix(cx, y0, y1, ph, o = {}) {
+  const amp = o.amp ?? 23, pitch = o.pitch ?? 40, band = o.band ?? 23;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(cx - amp - 8, y0, (amp + 8) * 2, y1 - y0); ctx.clip();
+  const th0 = -TAU, th1 = ((y1 - y0 + band) / pitch + 1) * TAU;
+  const yAt = th => y0 - band + (th / TAU) * pitch;
+  const xAt = th => cx + amp * Math.sin(th + ph);
+  const cuts = [th0];
+  for (let k = Math.ceil((th0 + ph - PI / 2) / PI); ; k++) {
+    const b = PI / 2 + k * PI - ph;
+    if (b >= th1) break;
+    if (b > th0) cuts.push(b);
+  }
+  cuts.push(th1);
+  const back = [], front = [];
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const a = cuts[i], b = cuts[i + 1];
+    (Math.cos((a + b) / 2 + ph) > 0 ? front : back).push([a, b]);
+  }
+  ctx.strokeStyle = C.ink; ctx.lineWidth = o.lw ?? 3; ctx.lineJoin = 'round';
+  const strip = ([a, b], fill) => {
+    const N = 10;
+    ctx.beginPath();
+    for (let j = 0; j <= N; j++) { const th = a + (b - a) * j / N; j ? ctx.lineTo(xAt(th), yAt(th)) : ctx.moveTo(xAt(th), yAt(th)); }
+    for (let j = N; j >= 0; j--) { const th = a + (b - a) * j / N; ctx.lineTo(xAt(th), yAt(th) + band); }
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+  };
+  back.forEach(s => strip(s, o.back || C.leafD));
+  front.forEach(s => strip(s, o.front || C.leaf));
+  ctx.restore();
+}
+function circ(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
+function arm(sx, sy, a, side, pass) {
+  const len = 50, hx = sx + side * Math.cos(a) * len, hy = sy + Math.sin(a) * len;
+  const o = pass === 0 ? 3.5 : 0;
+  ctx.fillStyle = ctx.strokeStyle = pass === 0 ? C.ink : C.leaf;
+  ctx.lineWidth = 19 + o * 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(hx, hy); ctx.stroke();
+  circ(hx, hy, 14 + o);
+  for (const da of [-0.6, 0, 0.6]) { const fa = a + da; circ(hx + side * Math.cos(fa) * 15, hy + Math.sin(fa) * 15, 6.5 + o); }
+  const ta = a - 1.45; circ(hx + side * Math.cos(ta) * 12, hy + Math.sin(ta) * 12, 6 + o);
+}
+function blob(cx, cy, R, sx, sy) {
+  ctx.beginPath();
+  for (let i = 0; i <= 48; i++) {
+    const th = i / 48 * TAU;
+    const r = R * (1 + 0.035 * Math.sin(3 * th + 0.7) + 0.022 * Math.sin(5 * th + 2.1) + 0.015 * Math.sin(2 * th + time * 0.8));
+    const px = cx + Math.cos(th) * r * sx, py = cy + Math.sin(th) * r * sy;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath();
+}
+function mouthPath(hx, hy) {
+  ctx.beginPath();
+  ctx.moveTo(hx - 36, hy + 10);
+  ctx.quadraticCurveTo(hx, hy + 15, hx + 36, hy + 10);
+  ctx.quadraticCurveTo(hx + 30, hy + 54, hx, hy + 54);
+  ctx.quadraticCurveTo(hx - 30, hy + 54, hx - 36, hy + 10);
+  ctx.closePath();
+}
+const boundSum = () => attached.reduce((s, a) => s + a.w, 0);
+function face(hx, hy) {
+  ctx.fillStyle = C.ink; ctx.strokeStyle = C.ink; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const over = G.mode === 'over';
+  if (P.hurtT > 0 && !over) {
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.moveTo(hx - 37, hy - 29); ctx.lineTo(hx - 22, hy - 18); ctx.lineTo(hx - 37, hy - 7);
+    ctx.moveTo(hx + 37, hy - 29); ctx.lineTo(hx + 22, hy - 18); ctx.lineTo(hx + 37, hy - 7);
+    ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i <= 24; i++) { const t = i / 24, x = hx - 30 + 60 * t, y = hy + 26 + Math.sin(t * TAU * 2 + time * 10) * 4; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke();
+    return;
+  }
+  const ry = P.blink > 0 ? 1.6 : 13;
+  ctx.beginPath(); ctx.ellipse(hx - 27 + P.lookX, hy - 18 + P.lookY, 6.5, ry, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(hx + 27 + P.lookX, hy - 18 + P.lookY, 6.5, ry, 0, 0, TAU); ctx.fill();
+  ctx.lineWidth = 4.5;
+  const worried = (P.worry > 0.5 || boundSum() >= 6 || G.plug > 0) && P.catchT <= 0 && G.shield <= 0;
+  if (worried && !over) {
+    ctx.beginPath(); ctx.moveTo(hx - 42, hy - 37); ctx.lineTo(hx - 16, hy - 45); ctx.moveTo(hx + 42, hy - 37); ctx.lineTo(hx + 16, hy - 45); ctx.stroke();
+  }
+  if (P.catchT > 0 && !over) {
+    mouthPath(hx, hy); ctx.fill();
+    ctx.save(); mouthPath(hx, hy); ctx.clip();
+    ctx.fillStyle = C.tongue; ctx.beginPath(); ctx.ellipse(hx, hy + 54, 19, 13, 0, 0, TAU); ctx.fill();
+    ctx.restore();
+  } else if (worried || over) {
+    ctx.beginPath(); arcS(ctx, hx, hy + 62, 42, 1.2 * PI, 1.8 * PI); ctx.stroke();
+  } else {
+    ctx.beginPath(); arcS(ctx, hx, hy - 6, 48, 0.24 * PI, 0.76 * PI); ctx.stroke();
+  }
+}
+function slotPos(a) {
+  const S = SLOTS[a.slot], tw = (a.slot % 4 < 2 ? -0.14 : 0.14);
+  return { x: P.x + S.side * 64, y: MC + S.dy - P.lift, hd: S.side < 0 ? tw : PI - tw };
+}
+function attachedPos(a) {
+  if (a.kind !== 'det') {
+    const cy = MC + (a.band >= 0 ? BANDS[a.band] : 20) - P.lift;
+    return { x: P.x + a.side * 74, y: cy, hd: a.side > 0 ? -0.6 : PI + 0.6 };
+  }
+  const s = slotPos(a), e = 1 - Math.pow(1 - a.t, 3);
+  return { x: lerp(a.sx, s.x, e) + Math.sin(time * 7 + a.ph) * 1.2, y: lerp(a.sy, s.y, e), hd: lerpAng(a.shd, s.hd, e) };
+}
+function wrapHd(pts) { return Math.atan2(pts[0][1] - pts[1][1], pts[0][0] - pts[1][0]); }
+function drawAmpWrap(a) {
+  const cy = MC + BANDS[a.band] - P.lift, n = 14, pts = [];
+  for (let i = 0; i <= n; i++) { const u = a.side > 0 ? 1 - i / n : i / n; pts.push([P.x - 72 + 144 * u, cy + Math.sin(u * TAU * 1.6 + time * 3 + a.ph) * 7]); }
+  const vis = pts.slice(0, Math.max(2, Math.ceil((n + 1) * a.t)));
+  drawAmphipol(ctx, vis, wrapHd(vis), time * 1.2 + a.ph);
+}
+function drawSmaWrap(a, back) {
+  const cy = MC + BANDS[a.band] - P.lift, rx = 78, ry = 13, n = 16, pts = [];
+  if (back) {
+    for (let i = 0; i <= n; i++) { const th = PI + PI * i / n; pts.push([P.x + rx * Math.cos(th), cy + ry * Math.sin(th)]); }
+    ctx.globalAlpha = 0.5 * a.t; drawSMA(ctx, pts, 0, time, true); ctx.globalAlpha = 1;
+    return;
+  }
+  for (let i = 0; i <= n; i++) { const th = a.side > 0 ? PI * i / n : PI - PI * i / n; pts.push([P.x + rx * Math.cos(th), cy + ry * Math.sin(th)]); }
+  const vis = pts.slice(0, Math.max(2, Math.ceil((n + 1) * a.t)));
+  drawSMA(ctx, vis, wrapHd(vis), time * 1.2 + a.ph, false);
+}
+function drawProtein() {
+  const k = G.instab;
+  const hx = P.x + (k > 0.5 && G.mode === 'playing' ? Math.sin(time * 31) * (k - 0.5) * 3 : 0), hy = P.hy;
+  const bot = MC + 112 - P.lift;
+  const shieldOn = G.shield > 0 && (G.shield > 2 || Math.floor(time * 8) % 2 === 0);
+  for (const a of attached) if (a.kind === 'sma' && a.band >= 0) drawSmaWrap(a, true);
+  if (shieldOn) {
+    // nanodisc: MSP belts frame the patch of bilayer around him
+    for (const sx of [-1, 1]) drawHelix(P.x + sx * 104, MC - 84 - P.lift, MC + 84 - P.lift, P.phase * 1.4 + sx, { amp: 11, pitch: 26, band: 14, lw: 2.6, front: C.msp, back: C.mspD });
+  }
+  drawHelix(hx - 30, hy + 40, bot, P.phase);
+  drawHelix(hx + 30, hy + 40, bot, P.phase + 1.3);
+  // cargo travelling down the channel between the helices
+  for (const c of cargo) { const p = cargoPos(c); if (!p.front) drawCargo(ctx, c.kind, p.x, p.y, c.rot, 0.85); }
+  for (const a of attached) if (a.kind === 'det') { const p = attachedPos(a); drawDetergent(ctx, p.x, p.y, p.hd, 0.95, time * 1.2 + a.ph); }
+  for (const a of attached) if (a.kind !== 'det' && a.band >= 0) { if (a.kind === 'amp') drawAmpWrap(a); else drawSmaWrap(a, false); }
+  if (G.plug > 0) {  // drug wedged in the mouth of the pore
+    const e = 1 - Math.pow(1 - G.plugA, 3);
+    drawDrug(ctx, lerp(G.plugFx, hx + Math.sin(time * 13) * 0.8, e), lerp(G.plugFy, hy + PLUG_DY, e), lerpAng(G.plugAng, PI / 2, e), lerp(1, 1.1, e), time);
+  }
+  const sh = [[hx - 66, hy + 4, P.aL, -1], [hx + 66, hy + 4, P.aR, 1]];
+  for (const pass of [0, 1]) for (const [sx, sy, a, side] of sh) arm(sx, sy, a, side, pass);
+  const lean = Math.abs(clamp(P.vx / MAXV, -1, 1)) * 0.05, sq = Math.sin(P.bounce * PI) * 0.06;
+  ctx.fillStyle = C.leaf; ctx.strokeStyle = C.ink; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+  blob(hx, hy, HEAD_R, 1 + lean + sq, 1 - lean * 0.5 - sq * 0.5); ctx.fill(); ctx.stroke();
+  if (shieldOn) {
+    ctx.globalAlpha = 0.35; ctx.strokeStyle = C.msp; ctx.lineWidth = 10;
+    blob(hx, hy, HEAD_R + 10, 1, 1); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  face(hx, hy);
+  for (const c of cargo) { const p = cargoPos(c); if (p.front) drawCargo(ctx, c.kind, p.x, p.y, c.rot, 1); }
+}
+// Caught cargo: swept into the head, then down the channel and out into the cytoplasm
+const cargoDur = c => [0.22, c.kind === 'lig' ? 0.75 : 0.5];
+function cargoPos(c) {
+  const [tA, tB] = cargoDur(c);
+  if (c.t < tA) { const e = 1 - Math.pow(1 - c.t / tA, 2); return { x: lerp(c.sx, P.x, e), y: lerp(c.sy, P.hy, e), front: true }; }
+  const e = clamp((c.t - tA) / tB, 0, 1);
+  return { x: P.x + Math.sin(e * TAU * 1.5) * 3, y: lerp(P.hy + 10, MC + 122 - P.lift, e), front: false };
+}
+function deliver(c) {
+  const x = P.x, y = MC + 124 - P.lift;
+  G.score += c.pts;
+  if (c.kind === 'lig') G.solutes++; else G.ions++;
+  released.push({ kind: c.kind, x, y, vx: rnd(-55, 55), vy: rnd(45, 75), life: 1.5, rot: c.rot });
+  say(x + rnd(-24, 24), y + 22, '+' + c.pts, C.ink, 24);
+  burst(x, y, c.kind === 'lig' ? C.lig : C[c.kind], 5, 80);
+  sfx('deliver');
+}
+function chainPts(it, n, sp) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const tau = i * sp / it.vy, tt = it.t - tau;
+    pts.push([it.x0 + Math.sin(tt * it.wf + it.wp) * it.wa, it.y - it.vy * tau]);
+  }
+  return pts;
+}
+function localChain(x, y, hd, n, sp, t) {
+  const c = Math.cos(hd), s = Math.sin(hd), pts = [];
+  for (let i = 0; i <= n; i++) { const lx = -i * sp, ly = Math.sin(i * 0.9 + t * 7) * 5; pts.push([x + lx * c - ly * s, y + lx * s + ly * c]); }
+  return pts;
+}
+function drawItem(it) {
+  const t = time + it.wp;
+  switch (it.type) {
+    case 'lig': drawLigand(ctx, it.x, it.y, it.rot, 1); break;
+    case 'ion': drawIon(ctx, it.x, it.y, it.ion, 1); break;
+    case 'pip': drawPIP(ctx, it.x, it.y, it.rot, 1); break;
+    case 'chol': drawChol(ctx, it.x, it.y, Math.sin(it.rot) * 0.5, 0.85); break;
+    case 'nd': drawNanodisc(ctx, it.x, it.y, it.rot, 1.15); break;
+    case 'drug': drawDrug(ctx, it.x, it.y, it.rot, 1, t); break;
+    case 'det': drawDetergent(ctx, it.x, it.y, it.hd, 1, t); break;
+    case 'amp': drawAmphipol(ctx, chainPts(it, 12, 10), it.hd, t); break;
+    case 'sma': drawSMA(ctx, chainPts(it, 11, 11), it.hd, t); break;
+  }
+}
+
+/* ---------- game logic ---------- */
+function burst(x, y, color, n, sp = 160) {
+  if (reduce) n = Math.ceil(n / 2);
+  for (let i = 0; i < n; i++) {
+    const a = rnd(0, TAU), v = rnd(sp * .3, sp);
+    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, life: rnd(.45, .8), r: rnd(2.5, 5), c: color });
+  }
+}
+function say(x, y, txt, color, size = 26) { texts.push({ x: clamp(x, 140, W - 140), y, txt, c: color, life: 1.2, size }); }
+function cheer(x, range) {
+  for (const L of [lipU, lipL]) for (const l of L) {
+    const d = Math.abs(l.x - x);
+    if (d < range) { l.jump = 1; l.delay = d / 1100; }
+  }
+}
+function spawn() {
+  const c = cfg(G.level);
+  const table = [['det', c.det], ['amp', c.amp], ['sma', c.sma], ['drug', c.drug], ['nd', c.nd], ['ion', 0.25]];
+  let r = Math.random(), type = 'lig';
+  for (const [k, p] of table) { if (r < p) { type = k; break; } r -= p; }
+  const n = type === 'det' ? 1 + (Math.random() < c.pair ? 1 : 0) + (Math.random() < c.triple ? 1 : 0)
+    : type === 'ion' ? 1 + (Math.random() < 0.45 ? 1 : 0) + (Math.random() < 0.15 ? 1 : 0) : 1;
+  const base = rnd(60, W - 60), poly = type === 'amp' || type === 'sma';
+  for (let i = 0; i < n; i++) {
+    const vy = c.vy * rnd(0.88, 1.12) * Math.sqrt(H / 600) * (type === 'det' ? 1.05 : poly ? 0.85 : type === 'ion' ? 1.12 : 1);
+    const x0 = clamp(base + (i ? rnd(-80, 80) : 0), 40, W - 40);
+    items.push({ type, x0, x: x0, y: -40 - i * rnd(25, 70), vy, t: 0,
+      wa: type === 'det' ? rnd(16, 34) : poly ? rnd(40, 70) : type === 'ion' ? rnd(8, 18) : rnd(6, 22), wf: poly ? rnd(1, 1.6) : rnd(1.2, 2.6), wp: rnd(0, TAU),
+      rot: rnd(0, TAU), vr: rnd(-2, 2), hd: PI / 2, ion: Math.random() < 0.55 ? 'na' : 'cl',
+      r: { lig: 14, ion: 11, chol: 18, pip: 17, nd: 20, drug: 17, det: 15, amp: 15, sma: 16 }[type], dead: false });
+  }
+}
+const multOf = c => 1 + Math.min(4, Math.floor(c / 5));
+function attachDet(it) {
+  const used = new Set(attached.filter(a => a.kind === 'det').map(a => a.slot));
+  let s = 0; while (used.has(s)) s++;
+  attached.push({ kind: 'det', w: 1, slot: s % SLOTS.length, sx: it.x, sy: it.y, shd: it.hd, t: 0, ph: rnd(0, TAU) });
+}
+function attachWrap(kind) {
+  const used = new Set(attached.filter(a => a.kind !== 'det').map(a => a.band));
+  let b = 0; while (used.has(b)) b++;
+  attached.push({ kind, w: WEIGHT[kind], band: b < BANDS.length ? b : -1, side: Math.random() < 0.5 ? -1 : 1, t: 0, ph: rnd(0, TAU) });
+}
+function knockOff(n) {
+  let k = 0;
+  while (k < n && attached.length) {
+    const a = attached.pop(), p = attachedPos(a), side = a.kind === 'det' ? SLOTS[a.slot].side : a.side;
+    flyers.push({ kind: a.kind, x: p.x, y: p.y, hd: p.hd, vx: side * rnd(170, 260), vy: -rnd(260, 360), vr: side * rnd(5, 9), life: 1.3, g: 420, ph: a.ph });
+    burst(p.x, p.y, C[a.kind], 6, 120);
+    k++;
+  }
+  if (k) cheer(P.x, 320);
+  return k;
+}
+function unplug() {
+  const y = P.hy + PLUG_DY;
+  G.plug = 0;
+  flyers.push({ kind: 'drug', x: P.x, y, hd: PI / 2, vx: (Math.random() < 0.5 ? -1 : 1) * rnd(150, 220), vy: -rnd(300, 380), vr: rnd(-8, 8), life: 1.3, g: 420, ph: 0 });
+  burst(P.x, y, C.drug, 10, 150); sfx('unplug');
+}
+function deflect(it) {
+  it.dead = true;
+  flyers.push({ kind: it.type, x: it.x, y: it.y, hd: it.hd, vx: (it.x >= P.x ? 1 : -1) * rnd(200, 300), vy: -rnd(250, 340), vr: rnd(-8, 8), life: 1.2, g: 420, ph: it.wp });
+  burst(it.x, it.y, C.msp, 10, 160);
+  if (G.blockMsgT <= 0) { say(it.x, it.y - 20, 'Blocked', C.mspD, 24); G.blockMsgT = 0.8; }
+  sfx('block');
+}
+function collect(it) {
+  it.dead = true;
+  if (it.type === 'lig' || it.type === 'ion') {
+    if (G.plug > 0) {
+      // pore is plugged: cargo bounces off
+      flyers.push({ kind: it.type === 'lig' ? 'lig' : it.ion, x: it.x, y: it.y, hd: it.rot, vx: (it.x >= P.x ? 1 : -1) * rnd(160, 240), vy: -rnd(220, 300), vr: rnd(-6, 6), life: 1.1, g: 420, ph: 0 });
+      if (G.blockMsgT <= 0) { say(it.x, it.y - 28, 'Pore blocked!', C.drug, 24); G.blockMsgT = 0.8; }
+      sfx('bonk');
+      return;
+    }
+    G.combo++;
+    const solute = it.type === 'lig';
+    cargo.push({ kind: solute ? 'lig' : it.ion, sx: it.x, sy: it.y, t: 0, rot: it.rot, pts: (solute ? 10 : 5) * multOf(G.combo) * (G.boost > 0 ? 2 : 1) });
+    burst(it.x, it.y, solute ? C.lig : C[it.ion], 6, 110);
+    P.catchT = 0.35; P.bounce = 1; sfx('catch');
+    if (G.combo % 5 === 0 && G.combo <= 20) { say(P.x, P.hy - 115, 'Combo ×' + multOf(G.combo), C.leaf, 30); sfx('combo', multOf(G.combo)); }
+  } else if (it.type === 'drug') {
+    if (G.shield > 0) { deflect(it); return; }
+    const fresh = G.plug <= 0;
+    if (fresh) { G.plugA = 0; G.plugFx = it.x; G.plugFy = it.y; G.plugAng = it.rot; }
+    G.plug = PLUG_S; G.combo = 0;
+    P.hurtT = 0.5; P.catchT = 0; G.shake = reduce ? 0 : 8;
+    say(P.x, P.hy - 112, fresh ? 'Drug plugged your pore!' : 'Another drug! Timer reset', C.drug, 28);
+    sfx('plug');
+  } else if (it.type === 'nd') {
+    G.shield = SHIELD_S;
+    say(it.x, it.y - 12, 'Nanodisc shield', C.mspD, 28);
+    burst(it.x, it.y, C.msp, 16); cheer(P.x, 420); sfx('shield'); P.catchT = 0.45; P.bounce = 1;
+  } else {
+    if (G.shield > 0) { deflect(it); return; }
+    G.combo = 0;
+    if (it.type === 'det') attachDet(it); else attachWrap(it.type);
+    const n = boundSum();
+    P.hurtT = 0.5; P.catchT = 0; G.shake = reduce ? 0 : it.type === 'det' ? 8 : 12;
+    const msg = it.type === 'det' ? `Detergent bound ${Math.min(n, MAX_DET)}/${MAX_DET}`
+      : it.type === 'amp' ? 'Amphipol wrapped you · slowed' : 'SMA belted you +3';
+    say(P.x, P.hy - 112, msg, it.type === 'det' ? C.detD : it.type === 'amp' ? C.ampD : C.smaD, 28);
+    sfx(it.type === 'det' ? 'chomp' : it.type === 'amp' ? 'wrap' : 'clank');
+    if (n >= MAX_DET) endGame();
+  }
+}
+function miss(it) {
+  it.dead = true;
+  const y = MC - 90;
+  if (it.type === 'lig') {
+    if (G.combo >= 5 && G.mode === 'playing') say(it.x, y - 20, 'Combo lost', C.muted, 22);
+    G.combo = 0; burst(it.x, y, C.lig, 6, 90);
+  } else if (it.type === 'det') {
+    // a missed detergent burrows into the bilayer for a while and upsets the lipids around it
+    inserted.push({ bx: it.x, x: it.x, life: 6, ph: rnd(0, TAU) });
+    if (inserted.length > 12) inserted.shift();
+    sfx('squelch');
+  } else if (it.type === 'sma') {
+    // SMA excises a disc of bilayer: a SMALP floats away and leaves a pore that blocks your path until it heals
+    const hw = 58, edge = hw + 62;
+    let x = it.x;
+    if (Math.abs(x - P.x) < edge) x = P.x + (x >= P.x ? 1 : -1) * edge;
+    if (x > 30 && x < W - 30 && G.mode === 'playing') {
+      holes.push({ x, hw, life: 7, max: 7 });
+      flyers.push({ kind: 'smalp', x, y: MC, hd: 0, vx: rnd(-15, 15), vy: -75, vr: 0, life: 4, g: -8, ph: rnd(0, TAU) });
+      burst(x, MC, C.sma, 12, 140); sfx('hole');
+      if (holes.length > 3) holes.shift();
+    } else burst(it.x, y, C.sma, 10, 120);
+  } else {
+    const col = { amp: C.amp, chol: C.chol, pip: C.pip, nd: C.msp, drug: C.drug, ion: C[it.ion] }[it.type] || C.muted;
+    burst(it.x, y, col, 8, 100);
+    if (it.type === 'amp') sfx('squelch');
+  }
+}
+const TIPS = [
+  'Cholesterol knocks one baddie off your legs. PIP₂ knocks off two.',
+  'Lipids only stay for a few seconds. Watch the timer and get there first.',
+  'GM3 doubles every solute and ion you carry for 8 seconds.',
+  'A drug in your pore stops all transport. PIP₂ pops it straight out.',
+  'Five catches in a row raises your multiplier, up to ×5.',
+  'Solutes and ions only score once they reach the cytoplasm.',
+  'A nanodisc shields you from everything for 10 seconds.',
+  'Amphipols count double and slow you down. Knock them off first.',
+  'SMA holes block your path until the bilayer heals.',
+  'Missed detergents sink into the bilayer and upset the lipids.'
+];
+function endGame() {
+  G.mode = 'over'; P.hurtT = 0; cargo = [];
+  const d = G.diff, newBest = G.score > bests[d] && G.score > 0;
+  if (newBest) { bests[d] = G.score; try { localStorage.setItem('dgs-best-' + d, String(G.score)); } catch (e) {} syncModes(); }
+  sfx('over');
+  setTimeout(() => {
+    if (G.mode !== 'over') return;
+    $('#overMsg').textContent = `Mr Membrane Protein was pulled out of the bilayer on level ${G.level} (${MODES[d].label}). You transported ${G.solutes} solute${G.solutes === 1 ? '' : 's'} and ${G.ions} ion${G.ions === 1 ? '' : 's'} for ${G.score} points.`;
+    $('#overBest').innerHTML = newBest ? `<span class="tag">New ${MODES[d].label} best</span>` : `${MODES[d].label} best: ${bests[d]}`;
+    $('#overTip').textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+    show('over');
+  }, 2000);
+}
+function show(id) {
+  for (const o of ['menu', 'pause', 'over']) $('#' + o).hidden = o !== id;
+  if (id) { const b = $('#' + id + ' .btn'); if (b) b.focus({ preventScroll: true }); }
+}
+function banner(L) { const p = plan().levels; G.banner = { title: 'Level ' + L, sub: L <= p.length ? p[L - 1].sub : 'Everything at once, and faster', t: 3.2, dur: 3.2 }; }
+function syncModes() {
+  for (const k in MODES) {
+    $('#diff-' + k).checked = k === G.diff;
+    $('#best-' + k).textContent = 'Best ' + bests[k];
+  }
+  $('#bestLbl').textContent = 'Best · ' + MODES[G.diff].label;
+  const I = plan().intro;
+  document.querySelectorAll('[data-intro]').forEach(el => { el.textContent = I[el.dataset.intro] <= 1 ? 'From the start.' : `Level ${I[el.dataset.intro]}.`; });
+}
+function setDiff(d) {
+  if (!MODES[d] || G.mode === 'playing' || G.mode === 'paused') return;
+  G.diff = d;
+  try { localStorage.setItem('dgs-diff', d); } catch (e) {}
+  syncModes();
+}
+function startGame() {
+  Object.assign(G, { mode: 'playing', score: 0, combo: 0, solutes: 0, ions: 0, t: 0, level: 1, levelT: 0, spawnIn: 1.2, shield: 0, boost: 0, memIn: 4, plug: 0, plugA: 1 });
+  items = []; parts = []; texts = []; inserted = []; attached = []; flyers = []; holes = []; cargo = []; released = []; memItems = [];
+  P.hurtT = 0; P.catchT = 0; P.lift = 0; inputMode = 'none';
+  banner(1);
+  show(null); sfx('start'); last = performance.now();
+}
+function pause() { if (G.mode !== 'playing') return; G.mode = 'paused'; keys.l = keys.r = false; show('pause'); }
+function resume() { if (G.mode !== 'paused') return; G.mode = 'playing'; show(null); last = performance.now(); }
+
+function update(dt) {
+  if (G.mode === 'paused') return;
+  time += dt;
+  const playing = G.mode === 'playing', over = G.mode === 'over';
+  const vmax = MAXV * (attached.some(a => a.kind === 'amp') ? 0.62 : 1);
+  let desired = 0;
+  const dir = (keys.r ? 1 : 0) - (keys.l ? 1 : 0);
+  if (playing) {
+    if (dir) { desired = dir * vmax; inputMode = 'keys'; }
+    else if (inputMode === 'pointer') desired = clamp((P.tx - P.x) * 7, -vmax, vmax);
+  } else if (G.mode === 'menu') {
+    const goal = W / 2 + Math.sin(time * 0.45) * W * 0.16;
+    desired = clamp((goal - P.x) * 1.6, -200, 200);
+  }
+  P.vx += (desired - P.vx) * Math.min(1, dt * 9);
+  P.x += P.vx * dt;
+  for (const h of holes) {
+    const e = hwNow(h) + 62; if (e <= 63) continue;
+    if (h.x >= P.x && P.x > h.x - e) { P.x = h.x - e; P.vx = Math.min(0, P.vx); }
+    else if (h.x < P.x && P.x < h.x + e) { P.x = h.x + e; P.vx = Math.max(0, P.vx); }
+  }
+  if (P.x < 120) { P.x = 120; P.vx = Math.max(0, P.vx); }
+  if (P.x > W - 120) { P.x = W - 120; P.vx = Math.min(0, P.vx); }
+  P.phase += (P.vx * 0.012 + 0.5) * dt;
+  P.catchT = Math.max(0, P.catchT - dt); P.hurtT = Math.max(0, P.hurtT - dt);
+  P.bounce = Math.max(0, P.bounce - dt * 4);
+  P.blinkIn -= dt; if (P.blinkIn <= 0) { P.blink = 0.13; P.blinkIn = rnd(2.2, 5); }
+  P.blink = Math.max(0, P.blink - dt);
+  // solubilised: the protein–baddie complex lifts out and the bilayer closes behind it
+  P.lift = over ? P.lift + (340 - P.lift) * Math.min(1, dt * 1.3) : 0;
+
+  const sv = P.vx / MAXV;
+  let aR = -0.28 + Math.sin(time * 2.4) * 0.2 - sv * 0.4;
+  let aL = -0.28 + Math.sin(time * 2.4 + 1.5) * 0.2 + sv * 0.4;
+  if (over) aR = aL = 0.8 + Math.sin(time * 3) * 0.08;
+  const ck = Math.min(1, P.catchT * 3), hk = Math.min(1, P.hurtT * 2.5);
+  P.aR = lerp(lerp(aR, -1.05, ck), 0.75, hk);
+  P.aL = lerp(lerp(aL, -1.05, ck), 0.75, hk);
+  P.hy = HY + Math.sin(time * 2) * 2.2 - Math.sin(P.bounce * PI) * 8 - P.lift + (over ? Math.sin(time * 3) * 4 : 0);
+  P.hands[0].x = P.x - 66 - Math.cos(P.aL) * 50; P.hands[0].y = P.hy + 4 + Math.sin(P.aL) * 50;
+  P.hands[1].x = P.x + 66 + Math.cos(P.aR) * 50; P.hands[1].y = P.hy + 4 + Math.sin(P.aR) * 50;
+
+  const n = boundSum(), nDet = attached.filter(a => a.kind === 'det').length;
+  G.push = lerp(G.push, Math.max(Math.min(40, nDet * 5), G.shield > 0 ? 52 : 0), Math.min(1, dt * 6));
+  G.gap = lerp(G.gap, over && P.lift > 90 ? 0 : 1, Math.min(1, dt * 3));
+  G.instab = lerp(G.instab, over && P.lift > 150 ? 0 : Math.min(1, n / MAX_DET), Math.min(1, dt * (over ? 0.8 : 2.5)));
+  for (const a of attached) a.t = Math.min(1, a.t + dt * (a.kind === 'det' ? 3 : 2.2));
+  for (const f of flyers) { f.life -= dt; f.vy += f.g * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.hd += f.vr * dt; }
+  flyers = flyers.filter(f => f.life > 0);
+  for (const h of holes) h.life -= dt;
+  holes = holes.filter(h => h.life > 0);
+  for (const c of cargo) {
+    c.t += dt; c.rot += dt * 2;
+    const [tA, tB] = cargoDur(c);
+    if (!c.sl && c.t >= tA) { c.sl = true; if (time - lastSlurp > 0.15) { lastSlurp = time; sfx('slurp'); } }
+    if (c.t >= tA + tB) { c.done = true; deliver(c); }
+  }
+  cargo = cargo.filter(c => !c.done);
+  for (const r of released) {
+    r.life -= dt; r.vx += rnd(-60, 60) * dt; r.vy *= 1 - dt * 1.2;
+    r.x += r.vx * dt; r.y += r.vy * dt; r.rot += dt;
+  }
+  released = released.filter(r => r.life > 0);
+  if (G.banner) { G.banner.t -= dt; if (G.banner.t <= 0) G.banner = null; }
+  G.blockMsgT = Math.max(0, G.blockMsgT - dt);
+
+  updateMem(dt, playing);
+  const lk = Math.min(1, dt * 14);
+  for (const [L, leaf] of [[lipU, 'up'], [lipL, 'low']]) for (const l of L) {
+    const px = pushX(l.bx);
+    l.x = lerp(l.x, px + memPush(px, leaf), lk);
+    if (l.delay > 0) l.delay -= dt; else l.jump = Math.max(0, l.jump - dt * 2.4);
+  }
+  for (const d of inserted) { d.life -= dt; d.x = lerp(d.x, pushX(d.bx), lk); }
+  inserted = inserted.filter(d => d.life > 0);
+  for (const w of water) {
+    w.vx = clamp(w.vx + rnd(-30, 30) * dt, -14, 14); w.vy = clamp(w.vy + rnd(-30, 30) * dt, -14, 14);
+    w.x += w.vx * dt; w.y += w.vy * dt;
+    if (w.x < 0) w.x += W; if (w.x > W) w.x -= W; if (w.y < 0) w.y += H; if (w.y > H) w.y -= H;
+  }
+
+  if (playing) {
+    G.t += dt;
+    G.boost = Math.max(0, G.boost - dt);
+    if (G.plug > 0) {
+      G.plugA = Math.min(1, G.plugA + dt / 0.3);
+      G.plug -= dt;
+      if (G.plug <= 0) { unplug(); say(P.x, P.hy - 112, 'Drug unbound', C.drug, 26); }
+    }
+    const prevSh = G.shield;
+    G.shield = Math.max(0, G.shield - dt);
+    if (prevSh > 0) {
+      if (G.shield === 0) sfx('shieldOff');
+      else if (G.shield <= 3 && Math.ceil(prevSh) !== Math.ceil(G.shield)) sfx('shieldWarn');
+    }
+    G.levelT += dt;
+    if (G.levelT >= levelDur(G.level)) {
+      G.level++; G.levelT = 0;
+      banner(G.level); sfx('level');
+      if (G.level === plan().intro.chol) G.memIn = 2.5;
+      // reward for clearing a level: the membrane recovers a little (Easy 2, Medium 1, Hard none)
+      const k = knockOff(MODES[G.diff].clear);
+      if (k) say(P.x, P.hy - 112, `Level cleared: ${k} knocked off`, C.leaf, 26);
+    }
+    G.spawnIn -= dt;
+    if (G.spawnIn <= 0) {
+      spawn();
+      G.spawnIn = cfg(G.level).gap * rnd(0.75, 1.25) * Math.sqrt(960 / W);
+    }
+  }
+
+  let near = null, nd = 1e9, foeNear = 1e9;
+  for (const it of items) {
+    it.t += dt; it.y += it.vy * dt;
+    it.x = it.x0 + Math.sin(it.t * it.wf + it.wp) * it.wa;
+    const foe = it.type === 'det' || it.type === 'amp' || it.type === 'sma';
+    if (foe) it.hd = Math.atan2(it.vy, it.wa * it.wf * Math.cos(it.t * it.wf + it.wp));
+    it.rot += it.vr * dt;
+    if (it.dead) continue;
+    if (playing) {
+      const dh = Math.hypot(it.x - P.x, it.y - P.hy);
+      let hit = dh < HEAD_R * 0.96 + it.r;
+      if (!hit) for (const h of P.hands) if (Math.hypot(it.x - h.x, it.y - h.y) < 22 + it.r) { hit = true; break; }
+      if (hit) { collect(it); continue; }
+      if (foe) foeNear = Math.min(foeNear, dh);
+      else if (it.y < P.hy && dh < nd) { nd = dh; near = it; }
+    }
+    if (it.y > MC - 86 - it.r * 0.4) miss(it);
+  }
+  items = items.filter(it => !it.dead);
+
+  let lx = 0, ly = 0;
+  if (near) { const dx = near.x - P.x, dy = near.y - P.hy, m = Math.hypot(dx, dy) || 1; lx = dx / m * 4; ly = dy / m * 4; }
+  const ek = Math.min(1, dt * 8);
+  P.lookX = lerp(P.lookX, lx, ek); P.lookY = lerp(P.lookY, ly, ek);
+  P.worry = lerp(P.worry, foeNear < 190 ? 1 : 0, ek);
+  if (playing && foeNear < 170 && G.shield <= 0) { G.snapT -= dt; if (G.snapT <= 0) { sfx('snap'); G.snapT = 0.45; } }
+  else G.snapT = 0;
+
+  for (const p of parts) { p.life -= dt; p.vy += 260 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+  parts = parts.filter(p => p.life > 0);
+  for (const t of texts) { t.life -= dt; t.y -= 38 * dt; }
+  texts = texts.filter(t => t.life > 0);
+  G.shake = Math.max(0, G.shake - dt * 30);
+}
+
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = C.paper; ctx.fillRect(0, 0, cv.width / dpr, cv.height / dpr);
+  const sx = G.shake ? rnd(-G.shake, G.shake) : 0, sy = G.shake ? rnd(-G.shake, G.shake) : 0;
+  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * (ox + sx), dpr * (oy + sy));
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  ctx.fillStyle = C.water; ctx.globalAlpha = 0.16;
+  for (const w of water) { if (Math.abs(w.y - MC) < 100) continue; ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, TAU); ctx.fill(); }
+  ctx.globalAlpha = 0.8; ctx.fillStyle = C.muted;
+  ctx.font = '20px "Patrick Hand", "Comic Sans MS", cursive'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText('extracellular', 18, MC - 108);
+  ctx.fillText('cytoplasm', 18, MC + 130);
+  ctx.globalAlpha = 1;
+
+  drawLipids();
+  for (const r of released) { ctx.globalAlpha = clamp(r.life / 0.6, 0, 1); drawCargo(ctx, r.kind, r.x, r.y, r.rot, 0.9); }
+  ctx.globalAlpha = 1;
+  drawProtein();
+  for (const f of flyers) {
+    ctx.globalAlpha = clamp(f.life / 0.5, 0, 1);
+    if (f.kind === 'det') drawDetergent(ctx, f.x, f.y, f.hd, 0.95, time + f.ph);
+    else if (f.kind === 'smalp') drawSMALP(ctx, f.x, f.y, time + f.ph);
+    else if (f.kind === 'drug') drawDrug(ctx, f.x, f.y, f.hd, 1.05, time);
+    else if (f.kind === 'lig' || f.kind === 'na' || f.kind === 'cl') drawCargo(ctx, f.kind, f.x, f.y, f.hd, 1);
+    else if (f.kind === 'amp') drawAmphipol(ctx, localChain(f.x, f.y, f.hd, 9, 10, time + f.ph), f.hd, time + f.ph);
+    else if (f.kind === 'sma') drawSMA(ctx, localChain(f.x, f.y, f.hd, 8, 11, time + f.ph), f.hd, time + f.ph);
+  }
+  ctx.globalAlpha = 1;
+  for (const it of items) drawItem(it);
+
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2;
+  for (const p of parts) {
+    ctx.globalAlpha = clamp(p.life / 0.5, 0, 1); ctx.fillStyle = p.c;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); ctx.stroke();
+  }
+  ctx.textAlign = 'center';
+  for (const t of texts) {
+    ctx.globalAlpha = clamp(t.life / 0.4, 0, 1);
+    ctx.font = `${t.size}px "Permanent Marker", "Comic Sans MS", cursive`;
+    ctx.lineWidth = 6; ctx.strokeStyle = C.paper; ctx.strokeText(t.txt, t.x, t.y);
+    ctx.fillStyle = t.c; ctx.fillText(t.txt, t.x, t.y);
+  }
+  if (G.banner) {
+    const b = G.banner, a = clamp(Math.min(b.t / 0.4, (b.dur - b.t) / 0.3), 0, 1), by = HY - 140;
+    ctx.globalAlpha = a;
+    ctx.font = '48px "Permanent Marker", "Comic Sans MS", cursive';
+    ctx.lineWidth = 9; ctx.strokeStyle = C.paper; ctx.strokeText(b.title, W / 2, by);
+    ctx.fillStyle = C.ink; ctx.fillText(b.title, W / 2, by);
+    ctx.font = '25px "Patrick Hand", "Comic Sans MS", cursive';
+    ctx.lineWidth = 6; ctx.strokeText(b.sub, W / 2, by + 34);
+    ctx.fillStyle = C.muted; ctx.fillText(b.sub, W / 2, by + 34);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- HUD ---------- */
+const hudC = {};
+function setText(id, v) { if (hudC[id] !== v) { hudC[id] = v; $('#' + id).textContent = v; } }
+function hud() {
+  setText('score', String(G.score));
+  setText('best', String(Math.max(bests[G.diff], G.score)));
+  const m = multOf(G.combo);
+  setText('combo', G.combo >= 2 ? `combo ${G.combo}${m > 1 ? ' · ×' + m : ''}` : '');
+  const n = Math.min(MAX_DET, boundSum()), sig = attached.map(a => a.kind[0]).join('') + G.level;
+  if (hudC.det !== sig) {
+    hudC.det = sig;
+    const pips = [];
+    for (const a of attached) for (let i = 0; i < a.w; i++) pips.push(a.kind);
+    const el = $('#meter'), danger = n >= 7;
+    el.innerHTML = Array.from({ length: MAX_DET }, (_, i) => `<i class="${pips[i] || ''}"></i>`).join('');
+    el.classList.toggle('danger', danger);
+    el.setAttribute('aria-label', `${n} of ${MAX_DET} bound`);
+    const lbl = $('#meterLbl');
+    lbl.textContent = `Level ${G.level} · Bound ${n}/${MAX_DET}`;
+    lbl.classList.toggle('danger', danger);
+  }
+  const sh = $('#shield');
+  if (G.shield > 0) { sh.hidden = false; $('#shieldbar').style.width = (G.shield / SHIELD_S * 100) + '%'; } else if (!sh.hidden) sh.hidden = true;
+  const pl = $('#plug');
+  if (G.plug > 0 && G.mode !== 'over') { pl.hidden = false; $('#plugbar').style.width = (G.plug / PLUG_S * 100) + '%'; } else if (!pl.hidden) pl.hidden = true;
+  const bo = $('#boost');
+  if (G.boost > 0 && G.mode !== 'over') { bo.hidden = false; $('#boostbar').style.width = (G.boost / BOOST_S * 100) + '%'; } else if (!bo.hidden) bo.hidden = true;
+  const pb = $('#pauseBtn'), active = G.mode === 'playing' || G.mode === 'paused';
+  if (pb.hidden === active) pb.hidden = !active;
+  const lbl = G.mode === 'paused' ? 'Resume' : 'Pause';
+  if (hudC.pl !== lbl) {
+    hudC.pl = lbl; pb.setAttribute('aria-label', lbl);
+    $('#pauseIco').innerHTML = lbl === 'Pause'
+      ? '<rect x="3" y="2" width="4" height="14" rx="1.5"/><rect x="11" y="2" width="4" height="14" rx="1.5"/>'
+      : '<path d="M4 2.5v13l11-6.5z"/>';
+  }
+}
+function syncSound() {
+  $('#sndOn').style.display = muted ? 'none' : '';
+  $('#sndOff').style.display = muted ? '' : 'none';
+  $('#soundBtn').setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute sound');
+}
+
+/* ---------- input ---------- */
+const isL = k => k === 'ArrowLeft' || k === 'a' || k === 'A';
+const isR = k => k === 'ArrowRight' || k === 'd' || k === 'D';
+window.addEventListener('keydown', e => {
+  if (isL(e.key)) { keys.l = true; e.preventDefault(); }
+  else if (isR(e.key)) { keys.r = true; e.preventDefault(); }
+  else if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+    if (G.mode === 'playing') pause(); else if (G.mode === 'paused') resume();
+  }
+});
+window.addEventListener('keyup', e => { if (isL(e.key)) keys.l = false; if (isR(e.key)) keys.r = false; });
+window.addEventListener('blur', () => { keys.l = keys.r = false; pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+const toLogical = e => { const r = cv.getBoundingClientRect(); return (e.clientX - r.left - ox) / scale; };
+cv.addEventListener('pointerdown', e => {
+  if (G.mode !== 'playing') return;
+  inputMode = 'pointer'; P.tx = toLogical(e);
+  try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+});
+cv.addEventListener('pointermove', e => {
+  if (G.mode !== 'playing') return;
+  if (e.pointerType === 'mouse' || e.buttons) { inputMode = 'pointer'; P.tx = toLogical(e); }
+});
+$('#playBtn').addEventListener('click', startGame);
+$('#againBtn').addEventListener('click', startGame);
+$('#modeBtn').addEventListener('click', () => { G.mode = 'menu'; attached = []; cargo = []; G.plug = 0; P.lift = 0; syncModes(); show('menu'); });
+document.querySelectorAll('input[name="diff"]').forEach(r => r.addEventListener('change', () => { if (r.checked) setDiff(r.value); }));
+$('#resumeBtn').addEventListener('click', resume);
+$('#pauseBtn').addEventListener('click', () => { if (G.mode === 'playing') pause(); else resume(); });
+$('#soundBtn').addEventListener('click', () => {
+  muted = !muted;
+  try { localStorage.setItem('dgs-muted', muted ? '1' : '0'); } catch (e) {}
+  syncSound(); if (!muted) sfx('catch');
+});
+
+/* ---------- legend icons ---------- */
+document.querySelectorAll('canvas.ico').forEach(c => {
+  const g = c.getContext('2d'); g.scale(2, 2);
+  const k = c.dataset.k;
+  const chain = (n, sp) => Array.from({ length: n + 1 }, (_, i) => [14 - i * sp, Math.sin(i * 0.9) * 5]);
+  if (k === 'lig') drawLigand(g, 20, 22, 0.6, 1.0);
+  else if (k === 'ion') { drawIon(g, 14, 25, 'na', 0.95); drawIon(g, 28, 16, 'cl', 0.95); }
+  else if (k === 'chol') drawChol(g, 18, 10, 0.15, 0.54);
+  else if (k === 'pip') drawPIP(g, 21, 18, 0, 0.76);
+  else if (k === 'nd') drawNanodisc(g, 21, 21, 0, 1.0);
+  else if (k === 'gm3') drawGM3(g, 17, 30, 0.6, 0, 20);
+  else if (k === 'drug') drawDrug(g, 21, 21, -0.5, 1.0, 0);
+  else if (k === 'det') drawDetergent(g, 28, 27, 0.55, 0.53, 0.4);
+  else { g.save(); g.translate(24, 21); g.scale(0.62, 0.62); const pts = chain(7, 9); (k === 'amp' ? drawAmphipol : drawSMA)(g, pts, 0, 0.3); g.restore(); }
+});
+
+/* ---------- loop + boot ---------- */
+function loop(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  update(dt); draw(); hud();
+  requestAnimationFrame(loop);
+}
+function boot(data) {
+  data = data || {};
+  resize();
+  P.x = P.tx = clamp(typeof data.px === 'number' ? data.px : W / 2, 120, W - 120);
+  buildLipids();
+  syncSound();
+  const kinds = Array.isArray(data.bound) ? data.bound : [];
+  const sum = kinds.reduce((s, k) => s + (WEIGHT[k] || 0), 0);
+  if ((data.mode === 'playing' || data.mode === 'paused') && sum < MAX_DET) {
+    Object.assign(G, { score: data.score | 0, combo: data.combo | 0, solutes: data.solutes | 0, ions: data.ions | 0, t: data.t || 0, level: data.level || 1, levelT: data.levelT || 0, mode: 'paused' });
+    if (MODES[data.diff]) G.diff = data.diff;
+    for (const k of kinds) {
+      if (k === 'det') attachDet({ x: P.x, y: MC, hd: 0 }); else if (WEIGHT[k]) attachWrap(k);
+      attached[attached.length - 1].t = 1;
+    }
+    show('pause');
+  } else show('menu');
+  syncModes();
+  new ResizeObserver(resize).observe(stage);
+  last = performance.now();
+  requestAnimationFrame(loop);
+}
+window.claude?.hot?.snapshot?.(() => ({ mode: G.mode, diff: G.diff, score: G.score, combo: G.combo, solutes: G.solutes, ions: G.ions, t: G.t, level: G.level, levelT: G.levelT, bound: attached.map(a => a.kind), px: P.x }));
+window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+})();
+</script>
+
+</body>
+</html>
