@@ -1,0 +1,1198 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SuperBugs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Luckiest+Guy&display=swap">
+<style>
+/* Layout: one 16:9 petri-dish stage, fitted to the window, centred on deep lab green (single deliberate theme) */
+:root{
+  --lab-night:#10260f;
+  --lab-edge:#1d3f19;
+  --agar:#8fd14f;
+  --label:#f2fbe8;
+  --font-display:"Luckiest Guy","Arial Black",Impact,sans-serif;
+  --font-ui:"Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html{height:100%;box-sizing:border-box}
+body{height:100%;box-sizing:border-box;margin:0;padding-inline:16px;padding-block:16px;background-color:var(--lab-night);background-image:radial-gradient(ellipse at 50% 40%,var(--lab-edge),var(--lab-night) 72%);color:var(--label);font-family:var(--font-ui);display:flex;align-items:center;justify-content:center;overflow:hidden}
+#stage{position:relative;max-width:100%}
+#game{display:block;width:100%;height:100%;border-radius:18px;touch-action:none;cursor:grab;outline:none;box-shadow:0 0 0 3px rgba(143,209,79,.22),0 18px 50px rgba(0,0,0,.5)}
+#game:focus-visible{box-shadow:0 0 0 3px var(--agar),0 18px 50px rgba(0,0,0,.5)}
+#game.dragging{cursor:grabbing}
+</style>
+
+<div id="stage"><canvas id="game" tabindex="0" aria-label="SuperBugs: eradicate the ESKAPE pathogens. Drag back to pull the syringe plunger, aim, and let go to fire the pill. Tap a waiting pill, or press 1 to 4, to load it instead. Tap mid-flight to use a pill's power. Escape pauses, R restarts."></canvas></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+(() => {
+'use strict';
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+const W = 1600, H = 900, G = 780, STEP = 1000 / 60, GACC = 0.001 * STEP * STEP, TAU = Math.PI * 2;
+const DF = '"Luckiest Guy","Arial Black",Impact,sans-serif';
+const UF = '"Baloo 2","Trebuchet MS",sans-serif';
+const RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+let scale = 1;
+
+function fit() {
+  const cs = getComputedStyle(document.body);
+  const aw = document.body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const ah = document.body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  let w = Math.max(200, aw), h = w * 9 / 16;
+  if (h > ah && ah > 100) { h = ah; w = h * 16 / 9; }
+  stage.style.width = w + 'px'; stage.style.height = h + 'px';
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  scale = canvas.width / W;
+}
+fit();
+window.addEventListener('resize', fit);
+try { new ResizeObserver(fit).observe(document.body); } catch (e) {}
+
+if (!window.Matter) {
+  ctx.fillStyle = '#10260f'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#f2fbe8'; ctx.font = '20px sans-serif'; ctx.fillText('The physics engine could not load. Reload the page to try again.', 20, 40);
+  return;
+}
+const { Engine, Bodies, Body, Composite, Events, Query } = Matter;
+try { document.fonts.load('86px "Luckiest Guy"'); document.fonts.load('800 24px "Baloo 2"'); document.fonts.load('italic 700 22px "Baloo 2"'); } catch (e) {}
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
+function rng(seed) { let s = seed >>> 0; return () => { s += 0x6D2B79F5; let t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function rr(c, x, y, w, h, r) { r = Math.max(0, Math.min(r, w / 2, h / 2)); c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+const fmt = n => n.toLocaleString('en-GB');
+const easeOutBack = t => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2);
+const smooth = t => t * t * (3 - 2 * t);
+
+/* ---------- Syringe launcher (local x runs along the barrel, origin at the stand clamp) ---------- */
+const PIV = { x: 302, y: 548 };
+const SY = { back: -86, front: 76, hub: 94, tip: 148, half: 26, rest: -4, fired: 62, pillX: 34, rod: 154 };
+const PULL_K = 0.55, MAX_PULL = 140, POWER = 0.145, ANG_MIN = -1.3, ANG_MAX = 0.7, ANG_REST = -0.35;
+
+/* ---------- Materials ---------- */
+const MAT = {
+  agar:  { density: 0.0012, friction: 0.85, restitution: 0.05, hp: 12, score: 500 },
+  glass: { density: 0.0018, friction: 0.5,  restitution: 0.08, hp: 5,  score: 300 }
+};
+
+/* ---------- The superbugs: the ESKAPE pathogens ---------- */
+const SPECIES = {
+  ef: { name: 'E. faecium',    shape: 'circle', r: 28,        hp: 5,  gen: 3, lt: '#d2b0f7', col: '#9b59d6', dk: '#6e32ab', ln: '#4b1c7d' },
+  sa: { name: 'S. aureus',     shape: 'circle', r: 28,        hp: 5,  gen: 2, lt: '#ffe98a', col: '#f2b72a', dk: '#d48f16', ln: '#94650c' },
+  kp: { name: 'K. pneumoniae', shape: 'rod',    w: 42, h: 62, hp: 7,  gen: 2, lt: '#f9b6d6', col: '#e46aa7', dk: '#b83f7c', ln: '#7d2453' },
+  ab: { name: 'A. baumannii',  shape: 'rod',    w: 46, h: 50, hp: 6,  gen: 3, lt: '#fbf1d6', col: '#e2cc94', dk: '#bfa368', ln: '#7f6a3c' },
+  pa: { name: 'P. aeruginosa', shape: 'rod',    w: 40, h: 66, hp: 12, gen: 3, lt: '#8fcaf7', col: '#3b8ad6', dk: '#2864a8', ln: '#1d4c80' },
+  ec: { name: 'E. cloacae',    shape: 'rod',    w: 42, h: 58, hp: 6,  gen: 2, lt: '#ffb199', col: '#e2583a', dk: '#b83a22', ln: '#7d2312' }
+};
+/* Strains get tougher plate by plate. S = susceptible, I = intermediate, R = resistant (intrinsic or acquired). */
+const S = 1, I = 0.5, R = 0.05;
+const STRAINS = {
+  pssa: { sp: 'sa', nick: 'PEN-S', sus: { amx: S, amc: S, van: S, mem: S, lzd: S, cst: R, fdc: R } },
+  mssa: { sp: 'sa', nick: 'MSSA',  sus: { amx: R, amc: S, van: S, mem: S, lzd: S, cst: R, fdc: R } },
+  mrsa: { sp: 'sa', nick: 'MRSA',  sus: { amx: R, amc: R, van: S, mem: R, lzd: S, cst: R, fdc: R } },
+  efs:  { sp: 'ef', nick: '',      sus: { amx: S, amc: S, van: S, mem: R, lzd: S, cst: R, fdc: R } },
+  vre:  { sp: 'ef', nick: 'VRE',   sus: { amx: R, amc: R, van: R, mem: R, lzd: S, cst: R, fdc: R } },
+  kp:   { sp: 'kp', nick: '',      sus: { amx: R, amc: S, van: R, mem: S, lzd: R, cst: S, fdc: S } },
+  esbl: { sp: 'kp', nick: 'ESBL',  sus: { amx: R, amc: R, van: R, mem: S, lzd: R, cst: S, fdc: S } },
+  kpc:  { sp: 'kp', nick: 'KPC',   sus: { amx: R, amc: R, van: R, mem: R, lzd: R, cst: S, fdc: S } },
+  crab: { sp: 'ab', nick: 'CRAB',  sus: { amx: R, amc: R, van: R, mem: R, lzd: R, cst: S, fdc: S } },
+  pa:   { sp: 'pa', nick: '',      sus: { amx: R, amc: R, van: R, mem: S, lzd: R, cst: S, fdc: S } },
+  mdr:  { sp: 'pa', nick: 'MDR',   sus: { amx: R, amc: R, van: R, mem: R, lzd: R, cst: S, fdc: S } },
+  ec:   { sp: 'ec', nick: 'AmpC',  sus: { amx: R, amc: R, van: R, mem: S, lzd: R, cst: I, fdc: S } }
+};
+const PHYS = 0.4;      // crushing damage to bugs from blocks and falls (drugs do the real work)
+const MUT = 0.2;       // one surviving exposure or mutation cuts a drug's effect to a fifth
+const SPONT = 0.3;     // chance a daughter cell carries a fresh resistance mutation
+const MAX_BUGS = 10;
+const TIER_COL = { S: '#2e9d3a', I: '#e3a21a', R: '#d8322b' };
+
+/* ---------- Antibiotics, from first line to last resort (WHO AWaRe groups) ---------- */
+const AWARE = { access: { t: 'ACCESS', c: '#2e9d3a' }, watch: { t: 'WATCH', c: '#e0901a' }, reserve: { t: 'RESERVE', c: '#d8322b' } };
+const PILLS = {
+  amx: { name: 'AMOXICILLIN',  abbr: 'AMX', aware: 'access',  cls: 'Penicillin · the usual first-line choice',              power: null,    shape: 'cap', w: 76, h: 40, a: '#f6d24a', b: '#9c2333', density: 0.004 },
+  amc: { name: 'CO-AMOXICLAV', abbr: 'AMC', aware: 'access',  cls: 'Amoxicillin + clavulanate · blocks β-lactamase · tap to split', power: 'split', shape: 'cap', w: 72, h: 38, a: '#f7f7f7', b: '#8ec3ea', density: 0.0032 },
+  van: { name: 'VANCOMYCIN',   abbr: 'VAN', aware: 'watch',   cls: 'Glycopeptide · Gram-positives, including MRSA',         power: null,    shape: 'cap', w: 76, h: 40, a: '#f7f5f1', b: '#e3342b', density: 0.004 },
+  mem: { name: 'MEROPENEM',    abbr: 'MEM', aware: 'watch',   cls: 'Carbapenem · broad spectrum · tap to split',             power: 'split', shape: 'cap', w: 74, h: 40, a: '#fff3df', b: '#f2902a', density: 0.0034 },
+  lzd: { name: 'LINEZOLID',    abbr: 'LZD', aware: 'reserve', cls: 'Oxazolidinone · MRSA and VRE · tap to dash',             power: 'dash',  shape: 'cap', w: 72, h: 38, a: '#2f7fd8', b: '#f1f4f6', density: 0.0036 },
+  cst: { name: 'COLISTIN',     abbr: 'CST', aware: 'reserve', cls: 'Polymyxin of last resort · Gram-negatives · tap to burst', power: 'fizz', shape: 'tab', r: 27, a: '#eef2f3', b: '#aebbc0', density: 0.004 },
+  fdc: { name: 'CEFIDEROCOL',  abbr: 'FDC', aware: 'reserve', cls: 'Siderophore "Trojan horse" · Gram-negatives · tap to dash', power: 'dash', shape: 'tab', r: 26, a: '#f8c631', b: '#d4950f', density: 0.0042 }
+};
+const TAP_HINT = { split: 'TAP TO SPLIT', dash: 'TAP FOR A SPEED BURST', fizz: 'TAP TO BURST THE MEMBRANES' };
+const halfLen = t => PILLS[t].shape === 'cap' ? PILLS[t].w / 2 : PILLS[t].r;
+const QX0 = 210, QDX = 56;
+
+/* ---------- Plates: escalating from first line to last resort ---------- */
+const LEVELS = [
+  { id: '1-1', pills: ['amx', 'amx', 'amx'],
+    brief: ['First line: amoxicillin still kills this S. aureus', 'Badges: S susceptible · I intermediate · R resistant · ×2 divides after this shot'],
+    build(L) {
+      L.box(1150, G, 30, 140, 'agar'); L.box(1310, G, 30, 140, 'agar'); L.box(1230, G - 140, 220, 22, 'glass');
+      L.bug('pssa', 1230, G); L.bug('pssa', 1230, G - 162);
+  } },
+  { id: '1-2', pills: ['amx', 'amc', 'amc'],
+    brief: ['β-lactamase enzymes wreck amoxicillin; co-amoxiclav blocks them', 'Tap a waiting pill (or press 1–4) to load it instead'],
+    build(L) {
+      L.box(1080, G, 70, 70, 'agar'); L.box(1080, G - 70, 70, 70, 'agar'); L.bug('efs', 1080, G - 140);
+      L.box(1170, G, 22, 100, 'glass'); L.box(1270, G, 22, 100, 'glass'); L.box(1220, G - 100, 140, 20, 'glass'); L.bug('kp', 1220, G);
+      L.box(1400, G, 70, 70, 'agar'); L.box(1400, G - 70, 70, 70, 'agar'); L.box(1400, G - 140, 70, 70, 'agar'); L.bug('mssa', 1400, G - 210);
+  } },
+  { id: '1-3', pills: ['mem', 'van', 'mem', 'mem', 'van'],
+    brief: ['MRSA resists every β-lactam; vancomycin still works', 'ESBL and AmpC Gram-negatives need a carbapenem'],
+    build(L) {
+      for (const x of [1050, 1190, 1330, 1470]) L.box(x, G, 70, 70, 'agar');
+      L.box(1260, G, 40, 40, 'glass');
+      L.bug('esbl', 1120, G); L.bug('ec', 1400, G); L.bug('pa', 1260, G - 40);
+      L.box(1120, G - 70, 210, 20, 'glass'); L.box(1400, G - 70, 210, 20, 'glass');
+      L.box(1120, G - 90, 70, 70, 'agar'); L.box(1400, G - 90, 70, 70, 'agar');
+      L.box(1260, G - 160, 360, 20, 'glass');
+      L.bug('mrsa', 1260, G - 180);
+  } },
+  { id: '1-4', pills: ['lzd', 'mem', 'cst', 'mem'],
+    brief: ['VRE shrugs off vancomycin; linezolid is held in reserve for it', 'CRAB beats carbapenems; colistin is the last resort'],
+    build(L) {
+      L.box(1060, G, 70, 70, 'agar'); L.box(1060, G - 70, 70, 70, 'agar'); L.bug('crab', 1060, G - 140);
+      L.box(1180, G, 24, 150, 'glass'); L.box(1320, G, 24, 150, 'glass'); L.box(1250, G - 150, 180, 30, 'agar');
+      L.bug('pa', 1250, G); L.flask(1250, G - 180, 90, 90);
+      L.box(1450, G, 70, 70, 'agar'); L.box(1450, G - 70, 70, 70, 'agar'); L.bug('vre', 1450, G - 140);
+  } },
+  { id: '1-5', pills: ['lzd', 'cst', 'fdc', 'fdc', 'lzd'],
+    brief: ['Final plate: all six ESKAPE superbugs at their worst', 'Only the antibiotics of last resort are left'],
+    build(L) {
+      L.box(1120, G, 70, 70, 'agar'); L.bug('kpc', 1200, G); L.box(1280, G, 70, 70, 'agar'); L.bug('crab', 1360, G); L.box(1440, G, 70, 70, 'agar');
+      L.box(1280, G - 70, 420, 20, 'glass');
+      const r2 = G - 90;
+      L.box(1150, r2, 70, 70, 'agar'); L.bug('mrsa', 1230, r2); L.box(1310, r2, 70, 70, 'agar'); L.bug('ec', 1390, r2); L.box(1460, r2, 70, 70, 'agar');
+      L.box(1300, r2 - 70, 400, 20, 'glass');
+      const r3 = r2 - 90;
+      L.box(1200, r3, 70, 70, 'agar'); L.bug('mdr', 1290, r3); L.box(1380, r3, 70, 70, 'agar');
+      L.box(1290, r3 - 70, 260, 20, 'glass');
+      L.flask(1290, r3 - 90, 100, 110);
+      L.bug('vre', 1550, G);
+  } }
+];
+
+/* ---------- State ---------- */
+let engine, world, levelIndex = 0, level, score = 0, queue = [], qx = [], current = null, state = 'aim', paused = false;
+let simTime = 0, armed = false, armAt = 0, flightTime = 0, calmSteps = 0, winAt = null, overlayAt = 0, stepCount = 0, growthEnd = 0;
+let drag = null, loadAnim = null, fireAnim = null, springAnim = null, syrAng = ANG_REST, activePill = null, trail = [], shots = 0, stars = 0;
+const removals = [], parts = [];
+let buttons = [];
+
+function makeBug(strain, x, bottom, parent) {
+  const type = STRAINS[strain].sp, sp = SPECIES[type]; let b;
+  if (sp.shape === 'circle') b = Bodies.circle(x, bottom - sp.r - 0.5, sp.r, { density: 0.001, friction: 1, frictionStatic: 3, restitution: 0.2, frictionAir: 0.02 });
+  else b = Bodies.rectangle(x, bottom - sp.h / 2 - 0.5, sp.w, sp.h, { chamfer: { radius: Math.min(sp.w, sp.h) * 0.45 }, density: 0.0012, friction: 0.9, frictionStatic: 2, restitution: 0.15, frictionAir: 0.015 });
+  b.plugin = {
+    kind: 'bug', type, strain, hp: sp.hp, maxHp: sp.hp, flash: 0, smug: 0, squash: 0, blink: rand(1, 4), phase: rand(0, TAU),
+    mut: parent ? { ...parent.mut } : {}, exp: {}, div: sp.gen, born: parent ? simTime : -9, resAt: -9,
+    top: sp.shape === 'circle' ? sp.r : sp.h / 2
+  };
+  Composite.add(world, b);
+  return b;
+}
+
+function buildLevel(def) {
+  const L = {
+    box(x, bottom, w, h, mat) {
+      const m = MAT[mat];
+      const b = Bodies.rectangle(x, bottom - h / 2 - 0.5, w, h, { density: m.density, friction: m.friction, frictionStatic: 1.2, restitution: m.restitution });
+      const hp = m.hp * Math.sqrt(w * h / 4900);
+      b.plugin = { kind: 'block', mat, w, h, hp, maxHp: hp, seed: (Math.random() * 1e9) | 0 };
+      Composite.add(world, b);
+    },
+    flask(x, bottom, w, h) {
+      const s = 0.55, t = (1 - s) * w, cy = h * (w + 2 * t) / (3 * (w + t));
+      const b = Bodies.trapezoid(x, bottom - cy - 0.5, w, h, s, { density: MAT.glass.density, friction: 0.5, restitution: 0.08 });
+      const hp = MAT.glass.hp * 1.3;
+      b.plugin = { kind: 'block', mat: 'glass', flask: true, w, h, hp, maxHp: hp, seed: (Math.random() * 1e9) | 0,
+        local: b.vertices.map(v => ({ x: v.x - b.position.x, y: v.y - b.position.y })) };
+      Composite.add(world, b);
+    },
+    bug(strain, x, bottom) { makeBug(strain, x, bottom, null); }
+  };
+  def.build(L);
+}
+
+function loadLevel(i) {
+  levelIndex = (i + LEVELS.length) % LEVELS.length; level = LEVELS[levelIndex];
+  engine = Engine.create({ positionIterations: 10, velocityIterations: 8 }); world = engine.world;
+  const ground = Bodies.rectangle(W / 2, G + 60, W * 3, 120, { isStatic: true, friction: 1 }); ground.plugin = { kind: 'ground' };
+  const wall = Bodies.rectangle(-40, 0, 80, H * 3, { isStatic: true }); wall.plugin = { kind: 'ground' };
+  Composite.add(world, [ground, wall]);
+  Events.on(engine, 'collisionStart', onCollide);
+  simTime = 0; stepCount = 0;
+  buildLevel(level);
+  score = 0; queue = level.pills.slice(); qx = queue.map((_, k) => QX0 - k * QDX);
+  current = null; activePill = null; trail = []; parts.length = 0; removals.length = 0;
+  armed = false; armAt = 0.8; winAt = null; paused = false; drag = null; fireAnim = null; springAnim = null; syrAng = ANG_REST; shots = 0; stars = 0;
+  canvas.classList.remove('dragging');
+  nextPill();
+}
+
+/* syringe geometry helpers */
+const toWorldS = (lx, ly = 0) => ({ x: PIV.x + Math.cos(syrAng) * lx - Math.sin(syrAng) * ly, y: PIV.y + Math.sin(syrAng) * lx + Math.cos(syrAng) * ly });
+const tipPos = () => toWorldS(SY.tip);
+const pillPos = () => toWorldS(SY.pillX);
+
+function nextPill() {
+  if (!queue.length) { current = null; return; }
+  const t = queue[0];
+  loadAnim = { t: 0, from: { x: qx[0], y: 776 - halfLen(t) } };
+  current = queue.shift(); qx.shift();
+  state = 'aim';
+}
+function swapIn(k) {
+  if (state !== 'aim' || !current || loadAnim || paused || drag || k >= queue.length || queue[k] === current) return;
+  const t = queue[k]; queue[k] = current; current = t;
+  loadAnim = { t: 0, from: { x: qx[k], y: 776 - halfLen(t) }, swap: true };
+  puff(qx[k], 750);
+}
+
+function makePill(type, x, y, sc) {
+  const P = PILLS[type]; let b;
+  if (P.shape === 'cap') b = Bodies.rectangle(x, y, P.w * sc, P.h * sc, { chamfer: { radius: P.h * sc * 0.48 }, density: P.density, friction: 0.6, restitution: 0.3, frictionAir: 0.003 });
+  else b = Bodies.circle(x, y, P.r * sc, { density: P.density, friction: 0.6, restitution: 0.35, frictionAir: 0.003 });
+  b.plugin = { kind: 'pill', type, scale: sc, hitAt: null, used: false };
+  return b;
+}
+
+/* ---------- Susceptibility ---------- */
+const eff = (b, drug) => (STRAINS[b.plugin.strain].sus[drug] ?? R) * (b.plugin.mut[drug] ?? 1);
+const tier = e => e >= 0.6 ? 'S' : e >= 0.25 ? 'I' : 'R';
+function resisted(b, rel) {
+  const d = b.plugin;
+  d.smug = 0.9;
+  if (rel > 3 && simTime - d.resAt > 0.8) { d.resAt = simTime; popText('RESISTANT', b.position.x, b.position.y - d.top - 40, '#5b6770', 26); }
+}
+function dose(b, drug, amt, rel) {
+  const e = eff(b, drug);
+  amt *= e;
+  if (e < 0.25) resisted(b, rel);
+  else if (amt >= 0.5) b.plugin.exp[drug] = (b.plugin.exp[drug] || 0) + amt;
+  return amt;
+}
+
+/* ---------- Damage ---------- */
+function onCollide(e) {
+  for (const pair of e.pairs) {
+    const a = pair.bodyA.parent, b = pair.bodyB.parent;
+    for (const [s, o] of [[a, b], [b, a]]) {
+      if (s.plugin.kind === 'pill' && s.plugin.hitAt == null && o.plugin.kind !== 'pill') { s.plugin.hitAt = simTime; s.frictionAir = 0.02; }
+    }
+    if (!armed) continue;
+    const rel = Math.hypot(a.velocity.x - b.velocity.x, a.velocity.y - b.velocity.y);
+    if (rel < 1.6) continue;
+    hurt(a, b, rel); hurt(b, a, rel);
+  }
+}
+function hurt(s, o, rel) {
+  const d = s.plugin;
+  if (d.hp == null || d.dead) return;
+  let f = o.isStatic ? 1 : Math.sqrt(o.mass / s.mass);
+  f = clamp(f, 0.45, 2.6);
+  let amt = (rel - 1.6) * f;
+  if (o.plugin.kind === 'pill') { amt *= 1.15; if (d.kind === 'bug') amt = dose(s, o.plugin.type, amt, rel); }
+  else if (d.kind === 'bug') amt *= PHYS;
+  applyDamage(s, amt);
+}
+function applyDamage(s, amt) {
+  const d = s.plugin;
+  if (!armed || d.dead || amt <= 0) return;
+  d.hp -= amt; score += Math.round(amt) * 10;
+  if (d.kind === 'bug' && amt > 0.5) d.flash = 0.35;
+  if (d.hp <= 0) { d.dead = true; removals.push(s); }
+}
+function processRemovals() {
+  for (const b of removals) {
+    Composite.remove(world, b);
+    const d = b.plugin, x = clamp(b.position.x, 50, W - 50), y = clamp(b.position.y, 80, H - 40);
+    if (d.kind === 'bug') {
+      const sp = SPECIES[d.type], nick = STRAINS[d.strain].nick;
+      score += 5000; splat(x, y, d.type); popText('5000', x, y - 34, sp.col);
+      popText(nick || sp.name.toUpperCase(), x, y - 78, sp.ln, 24);
+    }
+    else if (d.kind === 'block') { score += MAT[d.mat].score; if (!d.offscreen) shatter(b); }
+  }
+  removals.length = 0;
+}
+
+/* ---------- Divide, mutate, resist ---------- */
+function divide(b) {
+  const d = b.plugin, sp = SPECIES[d.type];
+  const hw = sp.shape === 'circle' ? sp.r : sp.w / 2, hh = sp.shape === 'circle' ? sp.r : sp.h / 2;
+  const bb = b.bounds, bottom = bb.max.y;
+  const side = Math.random() < 0.5 ? 1 : -1;
+  const sideA = { x: side > 0 ? bb.max.x + hw + 5 : bb.min.x - hw - 5, y: bottom - hh - 1 };
+  const sideB = { x: side > 0 ? bb.min.x - hw - 5 : bb.max.x + hw + 5, y: bottom - hh - 1 };
+  const above = { x: b.position.x, y: bb.min.y - hh - 5 };
+  // rods split end to end, cocci side by side
+  const cands = sp.shape === 'rod' ? [above, sideA, sideB] : [sideA, sideB, above];
+  const all = Composite.allBodies(world);
+  for (const c of cands) {
+    if (!isFinite(c.x) || !isFinite(c.y) || c.x < 60 || c.x > W - 50 || c.y - hh < 150) continue;
+    const box = { min: { x: c.x - hw - 2, y: c.y - hh - 2 }, max: { x: c.x + hw + 2, y: c.y + hh - 3 } };
+    if (Query.region(all, box).length) continue;
+    const nb = makeBug(d.strain, c.x, c.y + hh, d);
+    d.squash = 0.45;
+    parts.push({ t: 'ring', x: c.x, y: c.y, r: 8, vr: 4, c: 'rgba(255,255,255,.85)', life: .4, max: .4 });
+    popText('DIVIDED', c.x, c.y - hh - 26, sp.ln, 24);
+    return nb;
+  }
+  return null;
+}
+function evolve() {
+  let n = 0;
+  const bugs = world.bodies.filter(b => b.plugin.kind === 'bug' && !b.plugin.dead);
+  const drugs = [...new Set(queue)];
+  // selection: survivors of a sub-lethal dose come back resistant
+  for (const b of bugs) {
+    const d = b.plugin;
+    for (const drug in d.exp) {
+      if (eff(b, drug) >= 0.25) {
+        d.mut[drug] = (d.mut[drug] || 1) * MUT; d.squash = 0.45; n++;
+        popText('MUTATION! ' + PILLS[drug].abbr + '-R', b.position.x, b.position.y - d.top - 50, '#d8322b', 24);
+      }
+    }
+    d.exp = {};
+  }
+  // binary fission: daughters inherit resistance, and some pick up a new mutation
+  let alive = bugs.length;
+  for (const b of bugs) {
+    const d = b.plugin;
+    if (--d.div > 0) continue;
+    d.div = SPECIES[d.type].gen;
+    if (alive >= MAX_BUGS) continue;
+    const nb = divide(b);
+    if (!nb) continue;
+    alive++; n++;
+    if (Math.random() < SPONT) {
+      const opts = drugs.filter(dr => eff(nb, dr) >= 0.25);
+      if (opts.length) {
+        const dr = opts[(Math.random() * opts.length) | 0];
+        nb.plugin.mut[dr] = (nb.plugin.mut[dr] || 1) * MUT;
+        popText('MUTANT! ' + PILLS[dr].abbr + '-R', nb.position.x, nb.position.y - nb.plugin.top - 60, '#d8322b', 24);
+      }
+    }
+  }
+  return n;
+}
+
+/* ---------- Pill powers ---------- */
+const inWorld = b => world.bodies.indexOf(b) >= 0;
+function canUse(p) {
+  if (!p || p.plugin.used || !inWorld(p)) return false;
+  const pw = PILLS[p.plugin.type].power;
+  if (!pw) return false;
+  if (pw === 'fizz') return true;
+  return p.plugin.hitAt == null;
+}
+function useAbility() {
+  const p = activePill; if (!canUse(p)) return;
+  p.plugin.used = true;
+  const pw = PILLS[p.plugin.type].power;
+  if (pw === 'split') doSplit(p); else if (pw === 'dash') doDash(p); else doFizz(p);
+}
+function doSplit(p) {
+  const v = p.velocity, sp = Math.hypot(v.x, v.y), a = Math.atan2(v.y, v.x);
+  const nx = -Math.sin(a), ny = Math.cos(a);
+  for (const side of [-1, 1]) {
+    const da = side * 0.2;
+    const n = makePill(p.plugin.type, p.position.x + nx * side * 34, p.position.y + ny * side * 34, 0.8);
+    Body.setAngle(n, a + da); Body.setVelocity(n, { x: Math.cos(a + da) * sp, y: Math.sin(a + da) * sp });
+    n.plugin.used = true; Composite.add(world, n);
+  }
+  for (let i = 0; i < (RM ? 6 : 14); i++) { const q = rand(0, TAU), s = rand(1, 4); addDot(p.position.x, p.position.y, Math.cos(q) * s, Math.sin(q) * s, i % 2 ? '#bfe0ff' : '#ffffff', rand(3, 6), rand(.3, .6), 0); }
+}
+function doDash(p) {
+  const v = p.velocity, sp = Math.hypot(v.x, v.y) || 1, ns = Math.min(30, Math.max(sp * 1.8, 22));
+  Body.setVelocity(p, { x: v.x / sp * ns, y: v.y / sp * ns });
+  for (let i = 0; i < (RM ? 5 : 12); i++) addDot(p.position.x - v.x / sp * i * 6, p.position.y - v.y / sp * i * 6 + rand(-8, 8), -v.x / sp * 2, -v.y / sp * 2, i % 2 ? '#fff3b0' : '#f8c631', rand(3, 7), rand(.25, .5), 0);
+}
+function doFizz(p) {
+  const c = { x: p.position.x, y: p.position.y }, Rad = 200, drug = p.plugin.type;
+  Composite.remove(world, p); p.plugin.dead = true;
+  for (const b of Composite.allBodies(world)) {
+    if (b.isStatic) continue;
+    const dx = b.position.x - c.x, dy = b.position.y - c.y, dist = Math.hypot(dx, dy) || 1;
+    if (dist > Rad) continue;
+    const k = 1 - dist / Rad, dv = 17 * k / Math.max(1, Math.sqrt(b.mass / 3));
+    Body.setVelocity(b, { x: b.velocity.x + dx / dist * dv, y: b.velocity.y + dy / dist * dv - 2 * k });
+    if (b.plugin.hp != null) applyDamage(b, b.plugin.kind === 'bug' ? dose(b, drug, 15 * k, 5) : 15 * k);
+  }
+  for (let i = 0; i < (RM ? 14 : 34); i++) { const a = rand(0, TAU), s = rand(2, 9); parts.push({ t: 'bubble', x: c.x, y: c.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: rand(4, 12), life: rand(.6, 1.2), max: 1.2 }); }
+  parts.push({ t: 'ring', x: c.x, y: c.y, r: 20, vr: 12, c: 'rgba(255,255,255,.9)', life: .4, max: .4, lw: 8 });
+}
+
+/* ---------- Launch: push the plunger, the dose leaves the needle ---------- */
+function launch() {
+  const d = drag.d, len = drag.l;
+  drag = null; canvas.classList.remove('dragging');
+  if (len < 20) { springAnim = { t: 0, from: SY.rest - len * PULL_K }; return; }
+  const vx = -d.x * POWER, vy = -d.y * POWER, tip = tipPos(), col = PILLS[current].b;
+  const b = makePill(current, tip.x, tip.y, 1);
+  Body.setAngle(b, syrAng); Body.setVelocity(b, { x: vx, y: vy });
+  Composite.add(world, b);
+  for (let i = 0; i < (RM ? 5 : 12); i++) { const a = syrAng + rand(-0.5, 0.5), s = rand(2, 6); addDot(tip.x, tip.y, Math.cos(a) * s, Math.sin(a) * s, i % 2 ? col : 'rgba(255,255,255,.9)', rand(2, 5), rand(.3, .6), 0.25); }
+  fireAnim = { t: 0, from: SY.rest - len * PULL_K };
+  activePill = b; current = null; trail = []; shots++; flightTime = 0; calmSteps = 0; state = 'flying';
+}
+
+/* ---------- Particles ---------- */
+function addDot(x, y, vx, vy, c, r, life, g) { parts.push({ t: 'dot', x, y, vx, vy, c, r, life, max: life, g }); }
+function splat(x, y, type) {
+  const c = SPECIES[type].col;
+  for (let i = 0; i < (RM ? 10 : 24); i++) { const a = rand(0, TAU), s = rand(2, 8); addDot(x, y, Math.cos(a) * s, Math.sin(a) * s - 2, i % 3 ? c : '#bdf26b', rand(4, 9), rand(.5, 1), 0.3); }
+  parts.push({ t: 'ring', x, y, r: 10, vr: 5, c: 'rgba(255,255,255,.8)', life: .35, max: .35 });
+}
+function shatter(b) {
+  const d = b.plugin, n = RM ? 6 : Math.min(16, 6 + ((d.w * d.h) / 700 | 0));
+  const c = Math.cos(b.angle), s = Math.sin(b.angle);
+  for (let i = 0; i < n; i++) {
+    const ox = rand(-d.w / 2, d.w / 2), oy = rand(-d.h / 2, d.h / 2);
+    const x = b.position.x + ox * c - oy * s, y = b.position.y + ox * s + oy * c;
+    if (d.mat === 'glass') parts.push({ t: 'shard', x, y, vx: rand(-4, 4) + b.velocity.x * .5, vy: rand(-6, 1) + b.velocity.y * .5, a: rand(0, TAU), va: rand(-.3, .3), r: rand(5, 11), life: rand(.6, 1.1), max: 1.1, g: .35, c: 'rgba(225,250,255,.9)' });
+    else addDot(x, y, rand(-3, 3) + b.velocity.x * .5, rand(-5, 0) + b.velocity.y * .5, i % 2 ? '#8fd14f' : '#5fae31', rand(5, 10), rand(.6, 1), .35);
+  }
+}
+function puff(x, y) { for (let i = 0; i < (RM ? 6 : 12); i++) { const a = rand(0, TAU), s = rand(.5, 2.5); addDot(x, y, Math.cos(a) * s, Math.sin(a) * s - .5, 'rgba(255,255,255,.85)', rand(6, 12), rand(.4, .8), -0.02); } }
+function popText(txt, x, y, c, sz = 40) { parts.push({ t: 'text', txt, x: clamp(x, 120, W - 120), y, vx: 0, vy: -1, life: 1.3, max: 1.3, c, sz }); }
+function updateParts() {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i]; p.life -= STEP / 1000;
+    if (p.life <= 0) { parts.splice(i, 1); continue; }
+    p.x += p.vx || 0; p.y += p.vy || 0;
+    if (p.g) p.vy += p.g;
+    if (p.t === 'shard') p.a += p.va;
+    if (p.t === 'bubble') { p.vx *= 0.94; p.vy = p.vy * 0.94 - 0.06; }
+    if (p.t === 'ring') p.r += p.vr;
+    if ((p.t === 'dot' || p.t === 'shard') && p.g > 0 && p.y > G + 4) { p.y = G + 4; p.vy *= -0.3; p.vx *= 0.7; }
+  }
+}
+
+/* ---------- Simulation step ---------- */
+function bugsAlive() { let n = 0; for (const b of world.bodies) if (b.plugin.kind === 'bug' && !b.plugin.dead) n++; return n; }
+function isCalm() {
+  for (const b of world.bodies) { if (b.isStatic) continue; if (b.speed > 0.25 || Math.abs(b.angularVelocity) > 0.02) return false; }
+  return true;
+}
+function clearPills() {
+  for (const b of world.bodies.slice()) if (b.plugin.kind === 'pill') { puff(b.position.x, b.position.y); Composite.remove(world, b); }
+}
+function endTurn() {
+  clearPills(); activePill = null;
+  if (bugsAlive() === 0) { winAt = simTime; return; }
+  if (!queue.length) { state = 'lost'; return; }
+  if (evolve()) { state = 'growth'; growthEnd = simTime + 1.3; }
+  else nextPill();
+}
+function startBonus() {
+  clearPills(); activePill = null;
+  const left = [];
+  if (current) left.push(pillPos());
+  queue.forEach((t, k) => left.push({ x: qx[k], y: 776 - halfLen(t) }));
+  for (const p of left) { score += 10000; puff(p.x, p.y); popText('10000', p.x, p.y - 50, '#f8c631'); }
+  stars = 1 + Math.min(2, left.length);
+  queue = []; qx = []; current = null; loadAnim = null;
+  state = 'bonus'; overlayAt = simTime + (left.length ? 1.3 : 0.5);
+}
+const live = () => state === 'flying' || state === 'aim' || state === 'growth';
+function step() {
+  Engine.update(engine, STEP);
+  simTime += STEP / 1000; stepCount++;
+  if (!armed && simTime >= armAt) armed = true;
+  for (const b of world.bodies.slice()) {
+    if (b.isStatic) continue;
+    const p = b.position;
+    if (p.x > W + 160 || p.x < -200 || p.y > H + 200) {
+      if (b.plugin.kind === 'pill') Composite.remove(world, b);
+      else if (!b.plugin.dead) { b.plugin.dead = true; b.plugin.offscreen = true; removals.push(b); }
+    }
+  }
+  processRemovals();
+  const dt = STEP / 1000;
+  for (const b of world.bodies) {
+    const d = b.plugin;
+    if (d.kind === 'bug') {
+      d.flash = Math.max(0, d.flash - dt); d.smug = Math.max(0, d.smug - dt); d.squash = Math.max(0, d.squash - dt);
+      d.blink -= dt; if (d.blink < -0.12) d.blink = rand(1.5, 4.5);
+    }
+  }
+  const ap = activePill;
+  if (state === 'flying' && ap && inWorld(ap) && ap.plugin.hitAt == null && stepCount % 3 === 0) trail.push({ x: ap.position.x, y: ap.position.y, r: trail.length % 4 === 0 ? 6 : 3.5 });
+  if (ap && PILLS[ap.plugin.type].power === 'fizz' && !ap.plugin.used && ap.plugin.hitAt != null && simTime - ap.plugin.hitAt > 1.1 && inWorld(ap)) { ap.plugin.used = true; doFizz(ap); }
+  updateParts();
+  if (fireAnim) { fireAnim.t += dt; if (fireAnim.t > 0.7) fireAnim = null; }
+  if (springAnim) { springAnim.t += dt; if (springAnim.t > 0.8) springAnim = null; }
+  if (loadAnim) { loadAnim.t += dt / 0.45; if (loadAnim.t >= 1) loadAnim = null; }
+
+  if (live() && winAt == null && bugsAlive() === 0) winAt = simTime + 1.3;
+  if (winAt != null && live() && simTime >= winAt) { startBonus(); return; }
+  if (state === 'bonus' && simTime >= overlayAt) { state = 'won'; return; }
+  if (state === 'growth' && winAt == null && simTime >= growthEnd) { nextPill(); return; }
+  if (state === 'flying' && winAt == null) {
+    flightTime += dt;
+    calmSteps = isCalm() ? calmSteps + 1 : 0;
+    if ((calmSteps > 45 && flightTime > 1.5) || flightTime > 12) endTurn();
+  }
+}
+
+/* ---------- Background (pre-rendered) ---------- */
+function flaskBg(g, cx, b, w, h, liq) {
+  const nw = w * 0.24, nh = h * 0.36;
+  const path = () => { g.beginPath(); g.moveTo(cx - nw / 2, b - h); g.lineTo(cx - nw / 2, b - h + nh); g.lineTo(cx - w / 2, b - 14); g.quadraticCurveTo(cx - w / 2, b, cx - w / 2 + 14, b); g.lineTo(cx + w / 2 - 14, b); g.quadraticCurveTo(cx + w / 2, b, cx + w / 2, b - 14); g.lineTo(cx + nw / 2, b - h + nh); g.lineTo(cx + nw / 2, b - h); g.closePath(); };
+  path(); g.fillStyle = 'rgba(235,250,255,.35)'; g.fill();
+  g.save(); path(); g.clip(); g.fillStyle = liq; g.fillRect(cx - w, b - h * 0.42, w * 2, h); g.restore();
+  path(); g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 5; g.stroke();
+}
+function beakerBg(g, cx, b, w, h, liq) {
+  rr(g, cx - w / 2, b - h, w, h, 10); g.fillStyle = 'rgba(235,250,255,.35)'; g.fill();
+  g.save(); rr(g, cx - w / 2, b - h, w, h, 10); g.clip(); g.fillStyle = liq; g.fillRect(cx - w, b - h * 0.45, w * 2, h); g.restore();
+  rr(g, cx - w / 2, b - h, w, h, 10); g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 5; g.stroke();
+  g.lineWidth = 3; for (let i = 0; i < 4; i++) { const y = b - h * 0.2 - i * h * 0.18; g.beginPath(); g.moveTo(cx - w / 2 + 10, y); g.lineTo(cx - w / 2 + 30, y); g.stroke(); }
+}
+function rackBg(g, cx, b) {
+  const cols = ['rgba(240,120,170,.6)', 'rgba(90,170,240,.6)', 'rgba(250,210,80,.6)', 'rgba(160,120,230,.6)'];
+  g.fillStyle = 'rgba(245,250,250,.45)'; rr(g, cx - 120, b - 14, 240, 14, 4); g.fill(); g.fillRect(cx - 116, b - 110, 10, 100); g.fillRect(cx + 106, b - 110, 10, 100);
+  for (let i = 0; i < 4; i++) {
+    const x = cx - 84 + i * 56;
+    rr(g, x - 13, b - 190, 26, 175, 13); g.fillStyle = 'rgba(235,250,255,.45)'; g.fill();
+    g.save(); rr(g, x - 13, b - 190, 26, 175, 13); g.clip(); g.fillStyle = cols[i]; g.fillRect(x - 13, b - 100, 26, 100); g.restore();
+  }
+  g.fillStyle = 'rgba(245,250,250,.55)'; rr(g, cx - 120, b - 110, 240, 14, 4); g.fill();
+}
+function microscopeBg(g, cx, b) {
+  g.fillStyle = 'rgba(245,252,252,.55)'; rr(g, cx - 120, b - 36, 240, 36, 14); g.fill();
+  g.lineCap = 'round'; g.strokeStyle = 'rgba(240,250,250,.6)'; g.lineWidth = 44;
+  g.beginPath(); g.moveTo(cx + 70, b - 40); g.quadraticCurveTo(cx + 120, b - 200, cx + 40, b - 310); g.stroke();
+  g.fillStyle = 'rgba(230,245,245,.6)'; rr(g, cx - 110, b - 170, 170, 20, 6); g.fill();
+  g.save(); g.translate(cx - 10, b - 300); g.rotate(-0.45); g.fillStyle = 'rgba(245,252,252,.6)'; rr(g, -26, -110, 52, 190, 14); g.fill(); rr(g, -18, -150, 36, 46, 8); g.fill(); g.restore();
+  g.fillStyle = 'rgba(220,240,240,.6)'; rr(g, cx - 40, b - 214, 28, 44, 6); g.fill();
+  g.beginPath(); g.arc(cx + 95, b - 150, 24, 0, TAU); g.fill();
+}
+function buildBg() {
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  let gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#c4ea93'); gr.addColorStop(0.5, '#93d36a'); gr.addColorStop(1, '#5aa244');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  gr = g.createRadialGradient(820, 300, 40, 820, 300, 820); gr.addColorStop(0, 'rgba(255,255,225,.55)'); gr.addColorStop(1, 'rgba(255,255,225,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 2;
+  for (let x = 0; x <= W; x += 80) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 600); g.stroke(); }
+  for (let y = 0; y <= 600; y += 80) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  g.fillStyle = 'rgba(40,90,40,.28)'; g.fillRect(0, 600, W, H - 600);
+  g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(0, 597, W, 5);
+  g.save(); g.filter = 'blur(4px)';
+  flaskBg(g, 150, 600, 180, 320, 'rgba(120,200,235,.55)');
+  beakerBg(g, 360, 600, 120, 170, 'rgba(150,230,170,.5)');
+  rackBg(g, 560, 600);
+  microscopeBg(g, 1380, 600);
+  flaskBg(g, 1560, 600, 120, 220, 'rgba(240,200,120,.5)');
+  g.restore();
+  // petri dish
+  g.beginPath(); g.ellipse(800, 800, 880, 100, 0, 0, TAU); g.fillStyle = 'rgba(230,250,255,.22)'; g.fill(); g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 5; g.stroke();
+  g.save();
+  g.beginPath(); g.ellipse(800, 808, 850, 86, 0, 0, TAU); g.clip();
+  gr = g.createLinearGradient(0, 722, 0, 894); gr.addColorStop(0, '#a9e057'); gr.addColorStop(.5, '#7cc63c'); gr.addColorStop(1, '#4f9a28');
+  g.fillStyle = gr; g.fillRect(-60, 700, W + 120, 220);
+  // zone of inhibition around the antibiotic disc
+  gr = g.createRadialGradient(215, 790, 60, 215, 790, 320); gr.addColorStop(0, 'rgba(235,255,210,.45)'); gr.addColorStop(.85, 'rgba(235,255,210,.18)'); gr.addColorStop(1, 'rgba(235,255,210,0)');
+  g.save(); g.translate(0, 790); g.scale(1, 0.18); g.translate(0, -790); g.fillStyle = gr; g.beginPath(); g.arc(215, 790, 320, 0, TAU); g.fill(); g.restore();
+  // colonies
+  const Rn = rng(7);
+  for (let i = 0; i < 70; i++) {
+    const x = 520 + Rn() * 1200, y = 735 + Rn() * 140, r = 3 + Rn() * 7;
+    g.beginPath(); g.ellipse(x, y, r, r * 0.45, 0, 0, TAU); g.fillStyle = Rn() > .5 ? 'rgba(240,255,200,.5)' : 'rgba(255,235,150,.45)'; g.fill();
+  }
+  g.restore();
+  g.beginPath(); g.ellipse(800, 800, 800, 62, 0, Math.PI * 1.06, Math.PI * 1.94); g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = 4; g.stroke();
+  // antibiotic disc (launch pad); its label is drawn live with the loaded drug
+  g.beginPath(); g.ellipse(215, 786, 232, 30, 0, 0, TAU); g.fillStyle = '#c99a3c'; g.fill();
+  g.fillRect(-17, 774, 464, 12);
+  gr = g.createLinearGradient(0, 744, 0, 804); gr.addColorStop(0, '#fbeaa8'); gr.addColorStop(1, '#ecc965');
+  g.beginPath(); g.ellipse(215, 774, 232, 30, 0, 0, TAU); g.fillStyle = gr; g.fill(); g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 2; g.stroke();
+  // vignette
+  gr = g.createRadialGradient(800, 450, 500, 800, 450, 1000); gr.addColorStop(0, 'rgba(0,40,0,0)'); gr.addColorStop(1, 'rgba(0,40,0,.28)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  return c;
+}
+let bg = buildBg();
+try { document.fonts.ready.then(() => { bg = buildBg(); }); } catch (e) {}
+
+/* ---------- Drawing ---------- */
+function strokeText(txt, x, y, font, fill, stroke, lw, align = 'left') {
+  ctx.font = font; ctx.textAlign = align; ctx.lineJoin = 'round'; ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.strokeText(txt, x, y); ctx.fillStyle = fill; ctx.fillText(txt, x, y);
+}
+function face(s, mood, look, blink) {
+  const ex = s * 0.36, ey = -s * 0.1, er = s * 0.28;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (mood === 'hurt') {
+    ctx.strokeStyle = '#1d1208'; ctx.lineWidth = s * 0.12;
+    for (const sx of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sx * (ex + er * 0.7), ey - er * 0.7); ctx.lineTo(sx * (ex - er * 0.6), ey); ctx.lineTo(sx * (ex + er * 0.7), ey + er * 0.7); ctx.stroke(); }
+    ctx.beginPath(); ctx.ellipse(0, s * 0.48, s * 0.16, s * 0.12, 0, 0, TAU); ctx.fillStyle = '#3a1208'; ctx.fill();
+    return;
+  }
+  if (mood === 'smug') {
+    for (const sx of [-1, 1]) {
+      ctx.beginPath(); ctx.ellipse(sx * ex, ey, er * 0.82, er * 0.7, 0, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.lineWidth = Math.max(1, s * 0.06); ctx.strokeStyle = 'rgba(20,10,5,.6)'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(sx * ex + look.x * er * 0.3, ey + er * 0.22, er * 0.36, 0, TAU); ctx.fillStyle = '#161210'; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(sx * ex, ey, er * 0.9, er * 0.76, 0, Math.PI, TAU); ctx.fillStyle = 'rgba(40,20,8,.55)'; ctx.fill();
+    }
+    ctx.strokeStyle = '#22140a'; ctx.lineWidth = s * 0.12;
+    for (const sx of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sx * (ex + er * 0.9), ey - er * 1.15); ctx.lineTo(sx * (ex - er * 0.8), ey - er * 1.05); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(-s * 0.2, s * 0.46); ctx.quadraticCurveTo(s * 0.04, s * 0.58, s * 0.28, s * 0.34); ctx.lineWidth = s * 0.09; ctx.stroke();
+    return;
+  }
+  for (const sx of [-1, 1]) {
+    ctx.beginPath(); ctx.ellipse(sx * ex, ey, er * 0.82, blink ? er * 0.14 : er, 0, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.lineWidth = Math.max(1, s * 0.06); ctx.strokeStyle = 'rgba(20,10,5,.6)'; ctx.stroke();
+    if (!blink) {
+      const px = sx * ex + look.x * er * 0.38, py = ey + look.y * er * 0.4 + (mood === 'angry' ? er * 0.15 : 0);
+      ctx.beginPath(); ctx.arc(px, py, er * 0.42, 0, TAU); ctx.fillStyle = '#161210'; ctx.fill();
+      ctx.beginPath(); ctx.arc(px - er * 0.12, py - er * 0.14, er * 0.13, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+    }
+  }
+  ctx.strokeStyle = '#22140a'; ctx.lineWidth = s * 0.14;
+  for (const sx of [-1, 1]) {
+    ctx.beginPath();
+    if (mood === 'angry') { ctx.moveTo(sx * (ex + er * 1.0), ey - er * 1.45); ctx.lineTo(sx * (ex - er * 1.0), ey - er * 0.8); }
+    else { ctx.moveTo(sx * (ex + er * 0.95), ey - er * 1.05); ctx.lineTo(sx * (ex - er * 0.85), ey - er * 1.5); }
+    ctx.stroke();
+  }
+  if (mood === 'angry') {
+    const mw = s * 0.5, mh = s * 0.2, my = s * 0.42;
+    rr(ctx, -mw / 2, my - mh / 2, mw, mh, mh * 0.4); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = s * 0.07; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-mw / 2, my); ctx.lineTo(mw / 2, my); ctx.lineWidth = s * 0.04; ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(-s * 0.2, s * 0.5); ctx.quadraticCurveTo(0, s * 0.34, s * 0.2, s * 0.5); ctx.lineWidth = s * 0.09; ctx.stroke();
+  }
+}
+function drawPill(type, x, y, ang, sc, upright, look) {
+  const P = PILLS[type];
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(sc, sc);
+  if (P.shape === 'cap') {
+    const w = P.w, h = P.h;
+    ctx.save(); rr(ctx, -w / 2, -h / 2, w, h, h / 2); ctx.clip();
+    ctx.fillStyle = P.a; ctx.fillRect(-w / 2, -h / 2, w / 2 + 1, h);
+    ctx.fillStyle = P.b; ctx.fillRect(0, -h / 2, w / 2, h);
+    const g = ctx.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, 'rgba(255,255,255,.55)'); g.addColorStop(.35, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,.25)');
+    ctx.fillStyle = g; ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(-2, -h / 2, 4, h);
+    ctx.restore();
+    rr(ctx, -w / 2, -h / 2, w, h, h / 2); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(50,22,18,.75)'; ctx.stroke();
+  } else {
+    const r = P.r, g = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r);
+    g.addColorStop(0, '#fff'); g.addColorStop(.25, P.a); g.addColorStop(1, P.b);
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(50,30,10,.7)'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.8, 0, TAU); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.stroke();
+  }
+  let lk = look;
+  if (upright) ctx.rotate(-ang);
+  else { const c = Math.cos(-ang), s = Math.sin(-ang); lk = { x: look.x * c - look.y * s, y: look.x * s + look.y * c }; }
+  face(P.shape === 'cap' ? P.h * 0.6 : P.r * 0.82, 'angry', lk, false);
+  ctx.restore();
+}
+
+/* bacterial bodies */
+function ball(x, y, r, sp) {
+  const g = ctx.createRadialGradient(x - r * .35, y - r * .4, r * .1, x, y, r); g.addColorStop(0, sp.lt); g.addColorStop(.6, sp.col); g.addColorStop(1, sp.dk);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = sp.ln; ctx.stroke();
+}
+function oval(x, y, rx, ry, rot, sp) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+  const g = ctx.createRadialGradient(-rx * .35, -ry * .4, 2, 0, 0, Math.max(rx, ry)); g.addColorStop(0, sp.lt); g.addColorStop(.6, sp.col); g.addColorStop(1, sp.dk);
+  ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, TAU); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = sp.ln; ctx.stroke();
+  ctx.restore();
+}
+function rodBody(w, h, rad, sp) {
+  rr(ctx, -w / 2, -h / 2, w, h, rad);
+  const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0); g.addColorStop(0, sp.lt); g.addColorStop(.55, sp.col); g.addColorStop(1, sp.dk);
+  ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = sp.ln; ctx.stroke();
+}
+function spots(list, c) { ctx.fillStyle = c; for (const [x, y, a, q] of list) { ctx.beginPath(); ctx.ellipse(x, y, a, q, 0, 0, TAU); ctx.fill(); } }
+function wavy(x0, y0, ang, len, amp, t) {
+  const ca = Math.cos(ang), sa = Math.sin(ang), nx = -sa, ny = ca;
+  ctx.beginPath(); ctx.moveTo(x0, y0);
+  for (let i = 1; i <= 8; i++) { const k = i / 8, w = Math.sin(k * 7 + t) * amp * k; ctx.lineTo(x0 + ca * len * k + nx * w, y0 + sa * len * k + ny * w); }
+  ctx.stroke();
+}
+function drawBug(b) {
+  const d = b.plugin, sp = SPECIES[d.type], hpr = clamp(d.hp / d.maxHp, 0, 1);
+  const tgt = activePill && inWorld(activePill) ? activePill.position : PIV;
+  let dx = tgt.x - b.position.x, dy = tgt.y - b.position.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+  const c = Math.cos(-b.angle), s = Math.sin(-b.angle), look = { x: dx * c - dy * s, y: dx * s + dy * c };
+  const blink = d.blink < 0, mood = d.flash > 0 ? 'hurt' : d.smug > 0 ? 'smug' : 'angry';
+  const t = RM ? 0 : simTime * 8 + d.phase;
+  ctx.save(); ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
+  let br = RM ? 1 : 1 + Math.sin(simTime * 3 + d.phase) * 0.025;
+  if (d.squash > 0) br *= 1 + Math.sin(d.squash / 0.45 * Math.PI) * 0.18;
+  ctx.scale(br, 1 / br);
+  const grow = clamp((simTime - d.born) / 0.35, 0, 1);
+  if (grow < 1) { const k = 0.35 + 0.65 * easeOutBack(grow); ctx.scale(k, k); }
+  if (d.type === 'sa') {
+    // golden grape-like cluster of cocci
+    const r = sp.r;
+    for (const [x, y, q] of [[-r * .9, -r * .35, .5], [r * .88, -r * .42, .46], [r * .1, -r * .86, .44]]) ball(x, y, r * q, sp);
+    ball(0, 0, r, sp);
+    spots([[-14, 14, 4, 4], [15, 12, 3, 3]], 'rgba(255,245,190,.5)');
+    face(r * 0.78, mood, look, blink);
+  } else if (d.type === 'ef') {
+    // diplococcus: two ovoid cells
+    const r = sp.r;
+    oval(-r * .44, 2, r * .56, r * .82, -0.22, sp); oval(r * .44, 2, r * .56, r * .82, 0.22, sp);
+    face(r * 0.72, mood, look, blink);
+  } else if (d.type === 'kp') {
+    // encapsulated rod
+    const w = sp.w, h = sp.h;
+    rr(ctx, -w / 2 - 9, -h / 2 - 9, w + 18, h + 18, 28); ctx.fillStyle = 'rgba(255,240,248,.38)'; ctx.fill();
+    ctx.setLineDash([6, 6]); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.stroke(); ctx.setLineDash([]);
+    rodBody(w, h, 19, sp);
+    spots([[-9, 18, 5, 4], [8, 24, 4, 3]], 'rgba(120,30,70,.3)');
+    ctx.save(); ctx.translate(0, -8); face(18, mood, look, blink); ctx.restore();
+  } else if (d.type === 'ab') {
+    // stubby coccobacillus with twitching pili
+    const w = sp.w, h = sp.h;
+    ctx.strokeStyle = sp.ln; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    for (const a of [-2.5, -0.7, 0.3, 2.8]) { const x0 = Math.cos(a) * w * .5, y0 = Math.sin(a) * h * .5; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 * 1.32, y0 * 1.32); ctx.stroke(); }
+    rodBody(w, h, 21, sp);
+    spots([[-10, 14, 4, 3], [11, -14, 3, 2.5]], 'rgba(110,90,40,.3)');
+    ctx.save(); ctx.translate(0, -2); face(18, mood, look, blink); ctx.restore();
+  } else if (d.type === 'pa') {
+    // rod with a single polar flagellum, sitting in biofilm
+    const w = sp.w, h = sp.h;
+    ctx.strokeStyle = sp.ln; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    wavy(0, -h / 2 + 2, -Math.PI / 2 + 0.3, 30, 5, t);
+    rodBody(w, h, 18, sp);
+    spots([[-8, 20, 4, 3], [9, 26, 3, 2.5]], 'rgba(20,50,100,.3)');
+    ctx.save(); ctx.translate(0, -10); face(17, mood, look, blink); ctx.restore();
+    if (hpr > 0.4) {
+      ctx.beginPath(); ctx.ellipse(0, h / 2 - 8, w * 0.95, 17, 0, 0, TAU);
+      ctx.fillStyle = 'rgba(214,246,170,.62)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.6)';
+      for (const [x, y, r] of [[-16, h / 2 - 10, 4], [4, h / 2 - 4, 3], [20, h / 2 - 12, 3.5]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
+    }
+  } else {
+    // ec: rod with peritrichous flagella
+    const w = sp.w, h = sp.h;
+    ctx.strokeStyle = sp.ln; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + 0.3; wavy(Math.cos(a) * w * .42, Math.sin(a) * h * .42, a, 18, 3, t + i); }
+    rodBody(w, h, 18, sp);
+    spots([[-9, 16, 4, 3], [9, 22, 3, 2.5]], 'rgba(110,30,15,.3)');
+    ctx.save(); ctx.translate(0, -8); face(18, mood, look, blink); ctx.restore();
+  }
+  ctx.restore();
+}
+function labelDrug() {
+  if (state === 'aim') return current;
+  if (activePill && inWorld(activePill)) return activePill.plugin.type;
+  return current || queue[0] || null;
+}
+function drawBugLabels() {
+  const drug = labelDrug(), items = [];
+  for (const b of world.bodies) {
+    const d = b.plugin; if (d.kind !== 'bug' || d.dead) continue;
+    if (simTime - d.born < 0.3) continue;
+    const sp = SPECIES[d.type], nick = STRAINS[d.strain].nick, divNext = d.div === 1;
+    ctx.font = 'italic 700 17px ' + UF; const tw = ctx.measureText(sp.name).width;
+    ctx.font = '800 14px ' + UF; const nw = nick ? ctx.measureText(nick).width + 7 : 0;
+    const total = tw + nw + (drug ? 28 : 0) + (divNext ? 36 : 0);
+    items.push({ b, sp, nick, tw, nw, divNext, total, x: clamp(b.position.x - total / 2, 12, W - 12 - total), y: b.position.y - Math.max(d.top, 30) - 18 });
+  }
+  // stack labels that would overlap
+  items.sort((p, q) => q.y - p.y);
+  const placed = [];
+  for (const it of items) {
+    let guard = 0;
+    while (guard++ < 8 && placed.some(p => Math.abs(p.y - it.y) < 22 && it.x < p.x + p.total + 8 && p.x < it.x + it.total + 8)) it.y -= 22;
+    placed.push(it);
+  }
+  for (const { b, sp, nick, tw, nw, divNext, y, x: x0 } of placed) {
+    let x = x0;
+    ctx.textAlign = 'left'; ctx.lineJoin = 'round'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,50,15,.85)';
+    ctx.font = 'italic 700 17px ' + UF; ctx.strokeText(sp.name, x, y); ctx.fillStyle = '#fff'; ctx.fillText(sp.name, x, y);
+    x += tw;
+    if (nick) { ctx.font = '800 14px ' + UF; ctx.strokeText(nick, x + 5, y); ctx.fillStyle = '#ffe69a'; ctx.fillText(nick, x + 5, y); x += nw; }
+    x += 4;
+    if (drug) {
+      const tr = tier(eff(b, drug));
+      ctx.beginPath(); ctx.arc(x + 12, y - 6, 11, 0, TAU); ctx.fillStyle = TIER_COL[tr]; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.font = '800 15px ' + UF; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText(tr, x + 12, y - 1);
+      x += 28;
+    }
+    if (divNext) {
+      const pulse = RM ? 1 : 0.75 + 0.25 * Math.sin(simTime * 6);
+      ctx.globalAlpha = pulse;
+      rr(ctx, x + 2, y - 17, 32, 22, 11); ctx.fillStyle = '#f1a51c'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.font = '800 15px ' + UF; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('×2', x + 18, y - 1);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+function drawBlock(b) {
+  const d = b.plugin, hpr = clamp(d.hp / d.maxHp, 0, 1);
+  ctx.save(); ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
+  if (d.flask) {
+    const v = d.local, path = () => { ctx.beginPath(); ctx.moveTo(v[0].x, v[0].y); for (let i = 1; i < v.length; i++) ctx.lineTo(v[i].x, v[i].y); ctx.closePath(); };
+    let minY = Infinity, maxY = -Infinity; for (const p of v) { minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }
+    ctx.save(); path(); ctx.clip();
+    ctx.fillStyle = 'rgba(212,245,250,.45)'; ctx.fillRect(-200, -200, 400, 400);
+    const lh = (maxY - minY) * 0.45;
+    ctx.fillStyle = 'rgba(60,165,225,.62)'; ctx.fillRect(-200, maxY - lh, 400, lh);
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(-200, maxY - lh, 400, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; for (const [x, y, r] of [[-12, maxY - 14, 4], [8, maxY - 26, 3], [-2, maxY - 34, 2]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
+    if (hpr < 0.75) cracks(d, Math.abs(maxY - minY) * 0.8, maxY - minY, hpr);
+    ctx.restore();
+    path(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke();
+    const top = v.filter(p => p.y < minY + 2);
+    if (top.length >= 2) { ctx.beginPath(); ctx.moveTo(top[0].x - 4, top[0].y); ctx.lineTo(top[top.length - 1].x + 4, top[top.length - 1].y); ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.stroke(); }
+    ctx.restore(); return;
+  }
+  const w = d.w, h = d.h;
+  if (d.mat === 'agar') {
+    const r = Math.min(9, w * 0.22, h * 0.22);
+    rr(ctx, -w / 2, -h / 2, w, h, r);
+    const g = ctx.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, '#a6e766'); g.addColorStop(1, '#5dae31');
+    ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#3c7f1f'; ctx.stroke();
+    if (w > 34 && h > 34) { rr(ctx, -w / 2 + 8, -h / 2 + 8, w - 16, h - 16, Math.max(2, r - 4)); ctx.fillStyle = 'rgba(205,250,150,.38)'; ctx.fill(); }
+    rr(ctx, -w / 2 + 5, -h / 2 + 4, Math.max(6, w * 0.42), Math.min(9, h * 0.22), 4); ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fill();
+    const Rr = rng(d.seed);
+    for (let i = 0; i < (w * h > 3000 ? 3 : 1); i++) { ctx.beginPath(); ctx.arc((Rr() - .5) * (w - 16), (Rr() - .5) * (h - 16), 1.5 + Rr() * 2.5, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fill(); }
+    if (hpr < 0.7) {
+      const R2 = rng(d.seed + 9);
+      for (let i = 0; i < (hpr < 0.35 ? 5 : 2); i++) { ctx.beginPath(); ctx.ellipse((R2() - .5) * (w - 12), (R2() - .5) * (h - 12), 3 + R2() * 6, 2 + R2() * 4, R2() * 3, 0, TAU); ctx.fillStyle = 'rgba(55,85,20,.45)'; ctx.fill(); }
+    }
+  } else {
+    const r = Math.min(5, w * 0.2, h * 0.2);
+    rr(ctx, -w / 2, -h / 2, w, h, r); ctx.fillStyle = 'rgba(212,245,250,.48)'; ctx.fill();
+    ctx.save(); rr(ctx, -w / 2, -h / 2, w, h, r); ctx.clip();
+    ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = Math.min(6, Math.min(w, h) * 0.25);
+    const k = Math.min(w, h);
+    for (const o of [0.18, 0.34]) { ctx.beginPath(); ctx.moveTo(-w / 2 + w * o, h / 2 + 4); ctx.lineTo(-w / 2 + w * o + k * 1.2, -h / 2 - 4); ctx.stroke(); }
+    if (hpr < 0.75) cracks(d, w, h, hpr);
+    ctx.restore();
+    rr(ctx, -w / 2, -h / 2, w, h, r); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.stroke();
+    if (w > 10 && h > 10) { rr(ctx, -w / 2 + 3.5, -h / 2 + 3.5, w - 7, h - 7, 3); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(90,160,175,.65)'; ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function cracks(d, w, h, hpr) {
+  const Rc = rng(d.seed + 3), cx = (Rc() - .5) * w * .5, cy = (Rc() - .5) * h * .5;
+  ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  for (let i = 0; i < (hpr < 0.4 ? 6 : 3); i++) {
+    let a = Rc() * TAU, px = cx, py = cy; ctx.beginPath(); ctx.moveTo(px, py);
+    for (let k = 0; k < 3; k++) { const len = (Rc() * .5 + .4) * Math.max(w, h) * .28; a += (Rc() - .5) * .9; px += Math.cos(a) * len; py += Math.sin(a) * len; ctx.lineTo(px, py); }
+    ctx.stroke();
+  }
+}
+
+/* ---------- Syringe on a retort stand ---------- */
+function steel(x0, y0, x1, y1) { const g = ctx.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, '#eef3f5'); g.addColorStop(.5, '#b9c5cb'); g.addColorStop(1, '#7f8d95'); return g; }
+function drawStand() {
+  ctx.lineJoin = 'round';
+  rr(ctx, 250, 760, 108, 16, 6); ctx.fillStyle = steel(0, 760, 0, 776); ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#46525a'; ctx.stroke();
+  rr(ctx, PIV.x - 6, PIV.y + 6, 12, 760 - PIV.y - 4, 5); ctx.fillStyle = steel(PIV.x - 6, 0, PIV.x + 6, 0); ctx.fill(); ctx.stroke();
+}
+function plungerX() {
+  if (drag) return SY.rest - drag.l * PULL_K;
+  if (fireAnim) { const k = clamp(fireAnim.t / 0.09, 0, 1); return fireAnim.from + (SY.fired - fireAnim.from) * k * k; }
+  if (springAnim) { const t = springAnim.t, k = Math.exp(-7 * t) * Math.cos(26 * t); return SY.rest + (springAnim.from - SY.rest) * k; }
+  if (!current) return SY.fired;
+  if (loadAnim && !loadAnim.swap) return SY.fired + (SY.rest - SY.fired) * smooth(loadAnim.t);
+  return SY.rest;
+}
+function drawSyringe() {
+  drawStand();
+  const hx = plungerX(), hf = SY.half, drug = current && !loadAnim ? current : null;
+  const rt = fireAnim ? fireAnim.t - 0.09 : -1, rec = rt > 0 ? -10 * Math.exp(-9 * rt) * Math.cos(24 * rt) : 0;
+  const glass = () => rr(ctx, SY.back, -hf, SY.front - SY.back, hf * 2, 8);
+  ctx.save(); ctx.translate(PIV.x, PIV.y); ctx.rotate(syrAng); ctx.translate(rec, 0);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // needle and hub
+  ctx.strokeStyle = '#5d6a71'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(SY.hub, 0); ctx.lineTo(SY.tip - 4, 0); ctx.stroke();
+  ctx.strokeStyle = '#d6dee2'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(SY.hub, -0.5); ctx.lineTo(SY.tip - 2, -0.5); ctx.stroke();
+  ctx.fillStyle = '#d6dee2'; ctx.beginPath(); ctx.moveTo(SY.tip - 6, -3); ctx.lineTo(SY.tip + 2, 2.5); ctx.lineTo(SY.tip - 6, 3); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(SY.front - 2, -13); ctx.lineTo(SY.hub, -7); ctx.lineTo(SY.hub, 7); ctx.lineTo(SY.front - 2, 13); ctx.closePath();
+  ctx.fillStyle = '#4fb36b'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#2d6b3e'; ctx.stroke();
+  // plunger rod and thumb rest
+  const thumb = hx - SY.rod;
+  rr(ctx, thumb, -7, hx - thumb, 14, 3); ctx.fillStyle = '#e8eef1'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#55626b'; ctx.stroke();
+  ctx.strokeStyle = 'rgba(85,98,107,.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(thumb + 6, 0); ctx.lineTo(hx - 4, 0); ctx.stroke();
+  rr(ctx, thumb - 9, -27, 11, 54, 5); ctx.fillStyle = '#dfe7eb'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#55626b'; ctx.stroke();
+  // barrel body and the dose inside it
+  glass(); ctx.fillStyle = 'rgba(240,252,255,.55)'; ctx.fill();
+  if (drug) { ctx.save(); glass(); ctx.clip(); ctx.fillStyle = PILLS[drug].b; ctx.globalAlpha = 0.35; ctx.fillRect(hx, -hf, SY.front - hx, hf * 2); ctx.restore(); }
+  rr(ctx, hx - 7, -hf + 3, 14, hf * 2 - 6, 4); ctx.fillStyle = '#3b4247'; ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(hx - 3, -hf + 5, 2, hf * 2 - 10);
+  ctx.restore();
+  if (drug) { const p = toWorldS(SY.pillX + rec); drawPill(drug, p.x, p.y, syrAng, 0.72, true, { x: 1, y: 0 }); }
+  ctx.save(); ctx.translate(PIV.x, PIV.y); ctx.rotate(syrAng); ctx.translate(rec, 0);
+  // graduations, glass edges, finger flange
+  ctx.strokeStyle = 'rgba(40,70,90,.6)'; ctx.lineWidth = 2;
+  for (let i = 0, x = SY.back + 18; x < SY.front - 8; i++, x += 13) { ctx.beginPath(); ctx.moveTo(x, -hf + 1); ctx.lineTo(x, -hf + (i % 5 ? 7 : 13)); ctx.stroke(); }
+  rr(ctx, SY.back + 10, -hf + 4, SY.front - SY.back - 24, 5, 2.5); ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fill();
+  glass(); ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(60,110,130,.55)'; ctx.stroke(); ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke();
+  rr(ctx, SY.back - 10, -hf - 17, 11, hf * 2 + 34, 5); ctx.fillStyle = '#eef5f8'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#55626b'; ctx.stroke();
+  ctx.restore();
+  // clamp boss
+  ctx.beginPath(); ctx.arc(PIV.x, PIV.y, 12, 0, TAU); ctx.fillStyle = steel(PIV.x - 12, PIV.y - 12, PIV.x + 12, PIV.y + 12); ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#46525a'; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PIV.x - 6, PIV.y); ctx.lineTo(PIV.x + 6, PIV.y); ctx.stroke();
+  // pill hopping in from the queue
+  if (loadAnim && current) {
+    const t = loadAnim.t, e = smooth(t), f = loadAnim.from, to = pillPos();
+    drawPill(current, f.x + (to.x - f.x) * e, f.y + (to.y - f.y) * e - Math.sin(Math.PI * t) * 120, (-Math.PI / 2) * (1 - e) + syrAng * e, 1 - 0.28 * e, true, { x: 1, y: 0 });
+  }
+}
+function drawQueue() {
+  for (let i = 0; i < queue.length; i++) {
+    const tx = QX0 - i * QDX; qx[i] += (tx - qx[i]) * 0.15;
+    const t = queue[i], hop = RM ? 0 : Math.pow(Math.max(0, Math.sin(simTime * 2.1 + i * 1.9)), 12) * 14;
+    ctx.beginPath(); ctx.ellipse(qx[i], 778, 20, 5, 0, 0, TAU); ctx.fillStyle = 'rgba(90,60,10,.25)'; ctx.fill();
+    drawPill(t, qx[i], 776 - halfLen(t) - hop, -Math.PI / 2, 1, true, { x: 1, y: 0 });
+    ctx.font = '800 16px ' + UF; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(70,40,10,.85)'; ctx.fillText(PILLS[t].abbr, qx[i], 806);
+  }
+}
+function drawDiscLabel() {
+  const t = current || (activePill && inWorld(activePill) ? activePill.plugin.type : null);
+  if (!t) return;
+  ctx.save(); ctx.translate(404, 784); ctx.scale(1, 0.45); ctx.font = '800 30px ' + UF; ctx.fillStyle = 'rgba(70,40,10,.7)'; ctx.textAlign = 'center'; ctx.fillText(PILLS[t].abbr, 0, 0); ctx.restore();
+}
+function drawAim() {
+  if (!drag || drag.l < 20) return;
+  const t0 = tipPos();
+  let x = t0.x, y = t0.y, vx = -drag.d.x * POWER, vy = -drag.d.y * POWER;
+  const f = 1 - 0.003;
+  for (let i = 1; i <= 84; i++) {
+    vx *= f; vy = vy * f + GACC; x += vx; y += vy;
+    if (y > G || x > W) break;
+    if (i % 3 === 0) {
+      const k = i / 84;
+      ctx.beginPath(); ctx.arc(x, y + 2, 6.5 - 3 * k, 0, TAU); ctx.fillStyle = 'rgba(20,60,20,.2)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 6 - 3 * k, 0, TAU); ctx.fillStyle = `rgba(255,255,255,${0.95 - 0.55 * k})`; ctx.fill();
+    }
+  }
+}
+function drawParts() {
+  for (const p of parts) {
+    const a = clamp(p.life / p.max, 0, 1); ctx.globalAlpha = a;
+    if (p.t === 'dot') { ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.5 + a * 0.5), 0, TAU); ctx.fillStyle = p.c; ctx.fill(); }
+    else if (p.t === 'shard') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.beginPath(); ctx.moveTo(-p.r, -p.r * .4); ctx.lineTo(p.r * .8, -p.r * .6); ctx.lineTo(p.r * .3, p.r * .7); ctx.closePath(); ctx.fillStyle = p.c; ctx.fill(); ctx.strokeStyle = 'rgba(120,190,205,.8)'; ctx.lineWidth = 1.2; ctx.stroke(); ctx.restore(); }
+    else if (p.t === 'bubble') { ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2; ctx.stroke(); }
+    else if (p.t === 'ring') { ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.strokeStyle = p.c; ctx.lineWidth = (p.lw || 4) * a; ctx.stroke(); }
+    else if (p.t === 'text') {
+      const k = 1 - a, sc = k < 0.15 ? 0.6 + k / 0.15 * 0.5 : 1.1;
+      ctx.globalAlpha = Math.min(1, p.life / 0.4);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.scale(sc, sc); strokeText(p.txt, 0, 0, p.sz + 'px ' + DF, '#fff', p.c, Math.max(5, p.sz / 5), 'center'); ctx.restore();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawLip() {
+  ctx.beginPath(); ctx.ellipse(800, 800, 880, 100, 0, 0.02, Math.PI - 0.02); ctx.strokeStyle = 'rgba(235,252,255,.5)'; ctx.lineWidth = 12; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(800, 796, 872, 94, 0, 0.15, Math.PI - 0.15); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.save(); ctx.translate(1130, 878); ctx.rotate(-0.04); ctx.font = 'italic 700 22px ' + UF; ctx.fillStyle = 'rgba(28,40,120,.72)'; ctx.textAlign = 'left';
+  ctx.fillText('PLATE ' + level.id + '  ·  37 °C  ·  24 h', 0, 0); ctx.restore();
+}
+const TILT = [-0.06, 0.04, -0.03, 0.05, -0.04, 0.06, -0.05, 0.03, -0.06];
+function drawTitle() {
+  const word = 'SUPERBUGS'; ctx.font = '86px ' + DF; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+  const ws = [...word].map(ch => ctx.measureText(ch).width), total = ws.reduce((a, b) => a + b, 0) - 2 * (ws.length - 1);
+  let x = 800 - total / 2;
+  for (let i = 0; i < word.length; i++) {
+    ctx.save(); ctx.translate(x + ws[i] / 2, 118 + (i % 2 ? 4 : -2)); ctx.rotate(TILT[i]);
+    const g = ctx.createLinearGradient(0, -68, 0, 0);
+    if (i < 5) { g.addColorStop(0, '#fff07a'); g.addColorStop(1, '#f6a41c'); } else { g.addColorStop(0, '#ff9a3a'); g.addColorStop(1, '#df2a1c'); }
+    ctx.lineWidth = 14; ctx.strokeStyle = '#3d1606'; ctx.strokeText(word[i], 0, 0);
+    ctx.fillStyle = g; ctx.fillText(word[i], 0, 0);
+    ctx.restore(); x += ws[i] - 2;
+  }
+  strokeText('Eradicate the ESKAPE pathogens', 800, 156, '800 24px ' + UF, '#fff', '#3d1606', 6, 'center');
+}
+function card(x, y, rows) {
+  let w = 0;
+  for (const r of rows) {
+    ctx.font = r.f; r.w = ctx.measureText(r.t).width;
+    if (r.tag) { ctx.font = '800 15px ' + UF; r.tw = ctx.measureText(r.tag.t).width + 18; r.w += 12 + r.tw; }
+    w = Math.max(w, r.w);
+  }
+  w += 40;
+  const lh = 30, h = rows.length * lh + 14;
+  x = clamp(x, w / 2 + 16, W - w / 2 - 16);
+  rr(ctx, x - w / 2, y - h / 2, w, h, Math.min(23, h / 2)); ctx.fillStyle = 'rgba(18,52,16,.8)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.stroke();
+  rows.forEach((r, i) => {
+    const by = y - h / 2 + lh * (i + 1), lx = x - r.w / 2;
+    ctx.font = r.f; ctx.textAlign = 'left'; ctx.fillStyle = r.c || '#fff'; ctx.fillText(r.t, lx, by);
+    if (r.tag) {
+      const tx = lx + r.w - r.tw;
+      rr(ctx, tx, by - 19, r.tw, 22, 11); ctx.fillStyle = r.tag.c; ctx.fill();
+      ctx.font = '800 15px ' + UF; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText(r.tag.t, tx + r.tw / 2, by - 3);
+    }
+  });
+}
+function drawHUD() {
+  strokeText('SCORE:', 30, 62, '32px ' + DF, '#fff', '#1f4a14', 7);
+  strokeText(String(score).padStart(6, '0'), 30, 108, '44px ' + DF, '#fff', '#1f4a14', 8);
+  strokeText('BUGS LEFT  ' + bugsAlive(), 32, 142, '800 22px ' + UF, '#eaffd0', '#1f4a14', 5);
+  drawTitle();
+  const px = 1536, py = 62;
+  ctx.beginPath(); ctx.arc(px, py + 4, 36, 0, TAU); ctx.fillStyle = 'rgba(20,60,10,.35)'; ctx.fill();
+  const g = ctx.createRadialGradient(px - 10, py - 12, 4, px, py, 36); g.addColorStop(0, '#c7f27a'); g.addColorStop(1, '#3f9a1c');
+  ctx.beginPath(); ctx.arc(px, py, 34, 0, TAU); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.fillStyle = '#fff'; rr(ctx, px - 13, py - 15, 9, 30, 3); ctx.fill(); rr(ctx, px + 4, py - 15, 9, 30, 3); ctx.fill();
+  strokeText('LEVEL', px, 134, '26px ' + DF, '#fff', '#1f4a14', 6, 'center');
+  strokeText(level.id, px, 170, '34px ' + DF, '#fff', '#1f4a14', 7, 'center');
+  if (paused) return;
+  if (state === 'aim' && shots === 0 && level.brief) card(800, 214, level.brief.map((t, i) => ({ t, f: (i ? '700 18px ' : '800 21px ') + UF, c: i ? '#dff5c8' : '#fff' })));
+  if (state === 'aim' && current && !drag && !loadAnim) {
+    const P = PILLS[current];
+    card(360, 404, [{ t: P.name, f: '28px ' + DF, tag: AWARE[P.aware] }, { t: levelIndex === 0 && shots === 0 ? 'Drag back to pull the plunger, aim and let go' : P.cls, f: '700 19px ' + UF, c: '#dff5c8' }]);
+  } else if (state === 'flying' && canUse(activePill)) card(360, 404, [{ t: TAP_HINT[PILLS[activePill.plugin.type].power], f: '800 24px ' + UF }]);
+}
+function button(x, y, w, h, label, action) {
+  rr(ctx, x, y + 5, w, h, h / 2); ctx.fillStyle = 'rgba(20,60,10,.35)'; ctx.fill();
+  const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#a9e861'); g.addColorStop(1, '#3e9a1f');
+  rr(ctx, x, y, w, h, h / 2); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = '#22600f'; ctx.stroke();
+  strokeText(label, x + w / 2, y + h / 2 + 12, '32px ' + DF, '#fff', '#1d4a0c', 7, 'center');
+  buttons.push({ x, y, w, h, action });
+}
+function headline(txt, y, maxW) {
+  let sz = 64; ctx.font = sz + 'px ' + DF; while (ctx.measureText(txt).width > maxW && sz > 24) { sz -= 2; ctx.font = sz + 'px ' + DF; }
+  ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 12; ctx.strokeStyle = '#3d1606'; ctx.strokeText(txt, 800, y);
+  const g = ctx.createLinearGradient(0, y - sz * 0.8, 0, y); g.addColorStop(0, '#ffef7a'); g.addColorStop(1, '#f59a1b');
+  ctx.fillStyle = g; ctx.fillText(txt, 800, y);
+}
+function sub(t, y) { ctx.font = '700 26px ' + UF; ctx.textAlign = 'center'; ctx.fillStyle = '#24521a'; ctx.fillText(t, 800, y); }
+function star(cx, cy, Rs, on) {
+  ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? Rs * 0.46 : Rs; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } ctx.closePath();
+  ctx.lineJoin = 'round'; ctx.lineWidth = 7; ctx.strokeStyle = on ? '#8a4a06' : 'rgba(40,80,40,.45)'; ctx.stroke();
+  if (on) { const g = ctx.createLinearGradient(0, cy - Rs, 0, cy + Rs); g.addColorStop(0, '#fff07a'); g.addColorStop(1, '#f5a01b'); ctx.fillStyle = g; } else ctx.fillStyle = 'rgba(80,120,80,.3)';
+  ctx.fill();
+}
+function drawOverlay() {
+  buttons = [];
+  const mode = paused ? 'pause' : (state === 'won' ? 'won' : (state === 'lost' ? 'lost' : null));
+  if (!mode) return;
+  ctx.fillStyle = 'rgba(8,30,10,.55)'; ctx.fillRect(0, 0, W, H);
+  const pw = 660, ph = mode === 'pause' ? 340 : 430, px = 800 - pw / 2, py = 450 - ph / 2 + 10;
+  rr(ctx, px, py + 10, pw, ph, 34); ctx.fillStyle = 'rgba(0,20,0,.35)'; ctx.fill();
+  const g = ctx.createLinearGradient(0, py, 0, py + ph); g.addColorStop(0, '#f2fff0'); g.addColorStop(1, '#cdeec0');
+  rr(ctx, px, py, pw, ph, 34); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 8; ctx.strokeStyle = '#2f7a1f'; ctx.stroke();
+  rr(ctx, px + 10, py + 10, pw - 20, ph - 20, 26); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke();
+  const lastLevel = levelIndex === LEVELS.length - 1;
+  if (mode === 'pause') {
+    headline('PAUSED', py + 100, pw - 60);
+    sub('Plate ' + level.id + '  ·  Esc resumes  ·  R restarts', py + 152);
+    button(px + 60, py + ph - 110, 250, 72, 'RESUME', () => { paused = false; });
+    button(px + pw - 310, py + ph - 110, 250, 72, 'RESTART', () => loadLevel(levelIndex));
+  } else if (mode === 'won') {
+    headline(lastLevel ? 'ESKAPE ERADICATED!' : 'PLATE CLEARED!', py + 96, pw - 60);
+    for (let i = 0; i < 3; i++) star(800 + (i - 1) * 120, py + 190 - (i === 1 ? 14 : 0), i === 1 ? 52 : 42, i < stars);
+    sub(lastLevel ? 'All six superbugs wiped out  ·  Score ' + fmt(score) : 'Score ' + fmt(score), py + 290);
+    button(px + 60, py + ph - 110, 250, 72, 'REPLAY', () => loadLevel(levelIndex));
+    button(px + pw - 310, py + ph - 110, 250, 72, lastLevel ? 'PLAY AGAIN' : 'NEXT', () => loadLevel(lastLevel ? 0 : levelIndex + 1));
+  } else {
+    headline('THE BUGS SURVIVED', py + 100, pw - 60);
+    sub('Survivors divided and passed on their resistance.', py + 178);
+    sub('Match each drug to the bugs it can still kill.', py + 218);
+    button(800 - 140, py + ph - 110, 280, 72, 'RETRY', () => loadLevel(levelIndex));
+  }
+}
+function render() {
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.drawImage(bg, 0, 0);
+  drawDiscLabel();
+  for (const t of trail) { ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fill(); }
+  drawQueue();
+  drawSyringe();
+  for (const b of world.bodies) {
+    const d = b.plugin;
+    if (d.kind === 'block') drawBlock(b);
+    else if (d.kind === 'bug') drawBug(b);
+    else if (d.kind === 'pill') {
+      const v = b.velocity, sp = Math.hypot(v.x, v.y);
+      drawPill(d.type, b.position.x, b.position.y, b.angle, d.scale, false, sp > 0.5 ? { x: v.x / sp, y: v.y / sp } : { x: 1, y: 0 });
+      if (b === activePill && canUse(b) && !paused) {
+        const r = halfLen(d.type) + 14 + (RM ? 0 : Math.sin(simTime * 10) * 4);
+        ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.arc(b.position.x, b.position.y, r, 0, TAU); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 3; ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+  }
+  if (state !== 'won' && state !== 'lost') drawBugLabels();
+  drawAim();
+  drawParts();
+  drawLip();
+  drawHUD();
+  drawOverlay();
+}
+
+/* ---------- Input ---------- */
+function toWorld(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+function updateDrag(p) {
+  let dx = p.x - drag.gx, dy = p.y - drag.gy, l = Math.hypot(dx, dy);
+  if (l > MAX_PULL) { dx *= MAX_PULL / l; dy *= MAX_PULL / l; l = MAX_PULL; }
+  if (l > 6) {
+    syrAng = clamp(Math.atan2(-dy, -dx), ANG_MIN, ANG_MAX);
+    dx = -Math.cos(syrAng) * l; dy = -Math.sin(syrAng) * l;
+  }
+  drag.d = { x: dx, y: dy }; drag.l = l;
+}
+function queueHit(p) {
+  for (let k = 0; k < queue.length; k++) {
+    const hl = halfLen(queue[k]);
+    if (Math.abs(p.x - qx[k]) < 30 && p.y > 776 - hl * 2 - 16 && p.y < 816) return k;
+  }
+  return -1;
+}
+canvas.addEventListener('pointerdown', e => {
+  const p = toWorld(e);
+  try { canvas.focus({ preventScroll: true }); } catch (err) {}
+  if (buttons.length) { for (const bt of buttons) if (p.x >= bt.x && p.x <= bt.x + bt.w && p.y >= bt.y && p.y <= bt.y + bt.h) { bt.action(); break; } return; }
+  if (Math.hypot(p.x - 1536, p.y - 62) < 44 && live()) { paused = true; drag = null; canvas.classList.remove('dragging'); return; }
+  if (state === 'flying') { useAbility(); return; }
+  if (state === 'aim' && current && !loadAnim) {
+    const k = queueHit(p);
+    if (k >= 0) { swapIn(k); return; }
+    drag = { id: e.pointerId, gx: p.x, gy: p.y, d: { x: 0, y: 0 }, l: 0 };
+    springAnim = null;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    canvas.classList.add('dragging');
+  }
+});
+canvas.addEventListener('pointermove', e => { if (drag && e.pointerId === drag.id) updateDrag(toWorld(e)); });
+canvas.addEventListener('pointerup', e => { if (drag && e.pointerId === drag.id) { if (paused) { drag = null; return; } launch(); } });
+canvas.addEventListener('pointercancel', () => { if (drag) { springAnim = { t: 0, from: SY.rest - drag.l * PULL_K }; drag = null; canvas.classList.remove('dragging'); } });
+window.addEventListener('keydown', e => {
+  const k = e.key;
+  if (k === 'Escape' || k === 'p' || k === 'P') {
+    if (live() || state === 'bonus') { paused = !paused; drag = null; canvas.classList.remove('dragging'); e.preventDefault(); }
+  } else if (k === 'r' || k === 'R') loadLevel(levelIndex);
+  else if (k === 'Enter') {
+    if (paused) paused = false;
+    else if (state === 'won') loadLevel(levelIndex === LEVELS.length - 1 ? 0 : levelIndex + 1);
+    else if (state === 'lost') loadLevel(levelIndex);
+  } else if (k === ' ') { if (state === 'flying' && !paused) { useAbility(); e.preventDefault(); } }
+  else if (k >= '1' && k <= '4') swapIn(+k - 1);
+});
+
+/* ---------- Loop ---------- */
+let acc = 0, last = performance.now(), looping = false;
+function frame(t) {
+  const dt = Math.min(50, t - last); last = t;
+  if (!paused) { acc += dt; while (acc >= STEP) { step(); acc -= STEP; } } else acc = 0;
+  render();
+  requestAnimationFrame(frame);
+}
+function start(data) {
+  const i = data && Number.isInteger(data.levelIndex) ? data.levelIndex : 0;
+  loadLevel(i);
+  if (!looping) { looping = true; last = performance.now(); requestAnimationFrame(frame); }
+}
+try { window.claude?.hot?.snapshot?.(() => ({ levelIndex })); } catch (e) {}
+const hot = window.claude?.hot;
+if (hot?.ready) hot.ready(start); else start(hot?.data ?? {});
+})();
+</script>
+
+</body></html>
