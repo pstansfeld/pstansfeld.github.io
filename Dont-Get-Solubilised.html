@@ -1,4 +1,8 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Don't Get Solubilised</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,6 +23,8 @@
   --msp:#38b2a3;
   --gm3:#a54399;
   --drug:#3b4a8c;
+  --hat:#e9b923;
+  --chol:#e0262a;
   --danger:#d8262a;
   --danger-bg:#f6e0df;
   --font-display:"Permanent Marker","Marker Felt","Comic Sans MS",cursive;
@@ -50,6 +56,8 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
 .pill.gm3 b{background:var(--gm3)}
 .pill.drug{border-color:var(--drug);color:var(--drug)}
 .pill.drug b{background:var(--drug)}
+.pill.hat b{background:var(--hat)}
+.pill.chol b{background:var(--chol)}
 .hud-r{display:flex;justify-content:flex-end;align-items:flex-start;gap:8px}
 .best{text-align:right;margin-right:2px}
 .icon-btn{pointer-events:auto;width:40px;height:40px;display:grid;place-items:center;background:var(--card);border:2.5px solid var(--ink);border-radius:46% 54% 50% 50% / 52% 48% 52% 48%;color:var(--ink);cursor:pointer;padding:0;flex:none}
@@ -83,8 +91,7 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
 .mode input:checked + label{background:var(--leaf);color:#fff;box-shadow:3px 3px 0 var(--ink)}
 .mode input:checked + label span,.mode input:checked + label i{color:#fff}
 .mode input:focus-visible + label{outline:3px solid var(--leaf);outline-offset:3px}
-.small{font-size:16px;color:var(--muted)}
-.tag{display:inline-block;background:var(--pip);border:2px solid var(--ink);border-radius:8px;padding:0 8px;color:var(--ink)}
+.small{font-size:16px;color:var(--muted)}.tag{display:inline-block;background:var(--pip);border:2px solid var(--ink);border-radius:8px;padding:0 8px;color:var(--ink)}
 @media (max-width:480px){
   .legend{grid-template-columns:1fr}
   .hud{padding:8px 10px;gap:6px}
@@ -95,6 +102,10 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
 }
 @media (prefers-reduced-motion:reduce){.btn:active{transform:none}}
 </style>
+<noscript><style>#menu{display:none!important}</style></noscript>
+</head>
+<body>
+
 
 <div id="stage">
   <canvas id="game" aria-label="Game area: a protein in a lipid bilayer"></canvas>
@@ -110,6 +121,8 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
       <div id="meter" class="meter" role="img" aria-label="0 of 10 bound"></div>
       <div id="shield" class="pill" hidden><span>Nanodisc</span><i><b id="shieldbar"></b></i></div>
       <div id="boost" class="pill gm3" hidden><span>GM3 ×2</span><i><b id="boostbar"></b></i></div>
+      <div id="hatPill" class="pill hat" hidden><span>Ligand hat</span><i><b id="hatbar"></b></i></div>
+      <div id="zoomPill" class="pill chol" hidden><span>Faster</span><i><b id="zoombar"></b></i></div>
       <div id="plug" class="pill drug" hidden><span>Pore blocked</span><i><b id="plugbar"></b></i></div>
     </div>
     <div class="hud-r">
@@ -123,6 +136,8 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
     </div>
   </div>
 
+  <noscript><div class="overlay"><div class="card" role="dialog"><h1>Don't Get Solubilised</h1>
+<p>This preview has JavaScript switched off, so the game can't run here. Open the file in Safari or Chrome, or use the shared link, to play.</p></div></div></noscript>
   <div id="menu" class="overlay">
     <div class="card" role="dialog" aria-labelledby="menuT">
       <h1 id="menuT">Don't Get Solubilised</h1>
@@ -133,10 +148,11 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
           <div class="item"><canvas class="ico" data-k="lig" width="84" height="84"></canvas><span><strong>Solute</strong>Carry it through, +10</span></div>
           <div class="item"><canvas class="ico" data-k="ion" width="84" height="84"></canvas><span><strong>Ion</strong>Na⁺ or Cl⁻, carry it through, +5</span></div>
           <div class="item"><canvas class="ico" data-k="nd" width="84" height="84"></canvas><span><strong>Nanodisc</strong>Shield for 10 s</span></div>
+          <div class="item"><canvas class="ico" data-k="hat" width="84" height="84"></canvas><span><strong>Ligand hat</strong>Sucks solutes and ions to you for 8 s</span></div>
         </div>
         <div class="lg">
           <div class="lbl">Grab in the membrane</div>
-          <div class="item"><canvas class="ico" data-k="chol" width="84" height="84"></canvas><span><strong>Cholesterol</strong>Both leaflets. Knocks off 1 baddie</span></div>
+          <div class="item"><canvas class="ico" data-k="chol" width="84" height="84"></canvas><span><strong>Cholesterol</strong>Both leaflets. Diffuse faster for 5 s</span></div>
           <div class="item"><canvas class="ico" data-k="pip" width="84" height="84"></canvas><span><strong>PIP₂</strong>Lower leaflet. Unplugs a drug, knocks off 2 baddies</span></div>
           <div class="item"><canvas class="ico" data-k="gm3" width="84" height="84"></canvas><span><strong>GM3</strong>Upper leaflet. Double points for 8 s</span></div>
         </div>
@@ -185,21 +201,22 @@ const C = {
   ink:'#1b1d1a', leaf:'#4f9a17', leafD:'#3a7311', lipid:'#7aa6da', tail:'#6c9bd2',
   chol:'#e0262a', pip:'#f2a23a', pipP:'#ffd84a', lig:'#ffc83a', oxy:'#e8513a',
   det:'#c9a5ca', detD:'#5a4466', amp:'#d4559b', ampD:'#9c2f6b', sma:'#8f979e', smaD:'#555c62',
-  msp:'#38b2a3', mspD:'#22786d', na:'#9ad6e8', cl:'#a6dd8a', glc:'#0072bc', gal:'#ffd400', sia:'#a54399', drug:'#3b4a8c', paper:'#ececea', muted:'#6b7268', white:'#fbfbf7',
+  msp:'#38b2a3', mspD:'#22786d', na:'#9ad6e8', cl:'#a6dd8a', glc:'#0072bc', gal:'#ffd400', sia:'#a54399', drug:'#3b4a8c', hatC:'#343743', hatB:'#e9b923', paper:'#ececea', muted:'#6b7268', white:'#fbfbf7',
   water:'#6a8fbd', tongue:'#e46a6a'
 };
 const MAX_DET = 10, SHIELD_S = 10, BOOST_S = 8, PLUG_S = 10, PLUG_DY = 140, BIND_S = 5;
+const HAT_S = 8, HAT_RANGE = 340, ZOOM_S = 5, ZOOM_X = 1.6;   // ligand hat suction; cholesterol diffusion boost
 const MEM_COL = { chol: C.chol, pip: C.pip, gm3: C.sia };
 const WEIGHT = { det: 1, amp: 2, sma: 3 };
 // Level plans: the level at which each thing first appears, with the banner for each level.
 // Easy/Medium introduce one idea per level; Hard throws everything in within four levels.
 const PLANS = {
   std: {
-    intro: { det: 2, chol: 2, pip: 3, gm3: 4, nd: 4, drug: 5, amp: 6, sma: 7 },
+    intro: { det: 2, chol: 2, pip: 3, hat: 3, gm3: 4, nd: 4, drug: 5, amp: 6, sma: 7 },
     levels: [
       { dur: 20, sub: 'Catch solutes and ions and carry them through' },
-      { dur: 30, sub: 'Detergents! Grab cholesterol in the membrane to knock them off' },
-      { dur: 30, sub: 'PIP₂ in the lower leaflet knocks off two' },
+      { dur: 30, sub: 'Detergents! Grab cholesterol in the membrane to diffuse faster' },
+      { dur: 30, sub: 'PIP₂ knocks off two. Catch a ligand hat to suck solutes in' },
       { dur: 30, sub: 'GM3 doubles your points. Nanodiscs shield you' },
       { dur: 30, sub: 'Drugs plug your pore. PIP₂ pops them out' },
       { dur: 30, sub: 'Amphipols wrap your legs and slow you down' },
@@ -207,11 +224,11 @@ const PLANS = {
     ]
   },
   hard: {
-    intro: { det: 1, chol: 1, pip: 2, amp: 2, gm3: 3, nd: 3, sma: 3, drug: 4 },
+    intro: { det: 1, chol: 1, pip: 2, amp: 2, gm3: 3, nd: 3, hat: 3, sma: 3, drug: 4 },
     levels: [
-      { dur: 25, sub: 'Detergents from the start! Grab cholesterol to knock them off' },
+      { dur: 25, sub: 'Detergents from the start! Cholesterol speeds you up' },
       { dur: 30, sub: 'Amphipols wrap and slow you. PIP₂ knocks off two' },
-      { dur: 30, sub: 'SMA cuts holes. GM3 and nanodiscs to the rescue' },
+      { dur: 30, sub: 'SMA cuts holes. GM3, nanodiscs and ligand hats help' },
       { dur: 30, sub: 'Drugs plug your pore. PIP₂ pops them out' }
     ]
   }
@@ -240,6 +257,7 @@ function cfg(L) {
     sma:    since('sma') < 0 ? 0 : (0.05 + Math.min(0.04, since('sma') * 0.008)) * M.foe * M.poly,
     drug:   since('drug') < 0 ? 0 : (0.03 + Math.min(0.025, since('drug') * 0.005)) * M.foe,
     nd:     since('nd') < 0 ? 0 : 0.03,
+    hat:    since('hat') < 0 ? 0 : 0.03,
     mem:    ['chol', 'pip', 'gm3'].filter(key => since(key) >= 0),
     stay:   Math.max(1.6, 4.4 - (L - 2) * 0.3 + M.stay),                           // how long membrane lipids linger
     memGap: since('gm3') < 0 ? [3.5, 5.5] : [4.5, 7.5]
@@ -263,7 +281,7 @@ let W = 960, H = 600, scale = 1, ox = 0, oy = 0, dpr = 1, MC = 430, HY = 272;
 const MAXV = 560, HEAD_R = 80;
 const P = { x:480, tx:480, vx:0, phase:0, catchT:0, hurtT:0, blinkIn:2.5, blink:0,
   lookX:0, lookY:0, worry:0, aL:-0.3, aR:-0.3, hy:272, bounce:0, lift:0, hands:[{x:0,y:0},{x:0,y:0}] };
-const G = { mode:'menu', score:0, combo:0, solutes:0, ions:0, t:0, level:1, levelT:0, banner:null, spawnIn:1, shield:0, boost:0, memIn:5, plug:0, plugA:1, plugFx:0, plugFy:0, plugAng:0, blockMsgT:0, snapT:0,
+const G = { mode:'menu', score:0, combo:0, solutes:0, ions:0, t:0, level:1, levelT:0, banner:null, spawnIn:1, shield:0, boost:0, hat:0, hatA:1, zoom:0, memIn:5, plug:0, plugA:1, plugFx:0, plugFy:0, plugAng:0, blockMsgT:0, snapT:0,
   push:0, gap:1, instab:0, best:0, shake:0 };
 let items = [], parts = [], texts = [], lipU = [], lipL = [], water = [], inserted = [], attached = [], flyers = [], holes = [];
 let cargo = [], released = [], memItems = [];
@@ -389,6 +407,9 @@ const SFX = {
   block: () => { osc('triangle', 1760, 1700, 0.28, 0.09); osc('sine', 2637, 2600, 0.2, 0.04); },
   shieldWarn: () => osc('sine', 880, 880, 0.06, 0.06),
   shieldOff: () => [1047, 784, 523].forEach((f, i) => osc('sine', f, f, 0.12, 0.05, i * 0.06)),
+  hat: () => { osc('triangle', 440, 880, 0.12, 0.08); noise(0.4, 0.1, 0.05, 'bandpass', 400, 2600, 1.5); osc('sine', 300, 620, 0.32, 0.05, 0.08, { vib: 18, vibDepth: 40 }); },   // pop on, then a vacuum whoosh
+  hatOff: () => osc('sine', 700, 280, 0.22, 0.06),
+  zoom: () => { noise(0.25, 0.12, 0, 'bandpass', 600, 3200, 2); osc('triangle', 520, 1040, 0.18, 0.07); },
   gm3: () => { [659, 831, 988, 1319].forEach((f, i) => osc('square', f, f, 0.1, 0.045, i * 0.055, { lp: 3000 })); osc('sine', 1319, 1319, 0.5, 0.05, 0.22, { vib: 7, vibDepth: 8 }); },
   lipidIn: () => { osc('sine', 330, 440, 0.09, 0.07); osc('sine', 440, 587, 0.1, 0.06, 0.1); },
   lipidOut: () => osc('sine', 587, 330, 0.18, 0.05),
@@ -521,6 +542,19 @@ function drawGM3(g, x, y, s, t, tl = 58) {
   g.fillStyle = C.sia; g.beginPath(); g.moveTo(13, -51); g.lineTo(24, -40); g.lineTo(13, -29); g.lineTo(2, -40); g.closePath(); g.fill(); g.stroke();
   g.fillStyle = C.white; dot(g, -3.3, -1.5, 1.5); dot(g, 3.3, -1.5, 1.5);
   g.strokeStyle = C.white; g.lineWidth = 1.5; g.beginPath(); arcS(g, 0, 0.5, 3.6, 0.15 * PI, 0.85 * PI); g.stroke();
+  g.restore();
+}
+// Ligand hat: a top hat with a little fused-ring ligand printed on its band. (x, y) is the middle of the brim.
+function drawHat(g, x, y, s, rot) {
+  g.save(); g.translate(x, y); g.rotate(rot); g.scale(s, s);
+  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = C.ink; g.lineWidth = 3;
+  g.fillStyle = C.hatC; g.beginPath(); g.ellipse(0, 0, 40, 8, 0, 0, TAU); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(-24, 0); g.lineTo(-27, -48); g.quadraticCurveTo(0, -53, 27, -48); g.lineTo(24, 0); g.quadraticCurveTo(0, 5, -24, 0); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#4b4f5c'; g.beginPath(); g.ellipse(0, -49, 27, 6, 0, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = C.hatB; g.beginPath(); g.moveTo(-24.5, -5); g.lineTo(-25.5, -18); g.quadraticCurveTo(0, -21, 25.5, -18); g.lineTo(24.5, -5); g.quadraticCurveTo(0, -2, -24.5, -5); g.closePath(); g.fill(); g.stroke();
+  g.lineWidth = 1.5;
+  for (const cx of [-7.3, 0, 7.3]) { hexAt(g, cx, -11.5, 4.2, PI / 6); g.stroke(); }
+  g.strokeStyle = 'rgba(255,255,255,0.28)'; g.lineWidth = 3; g.beginPath(); g.moveTo(-17, -42); g.lineTo(-18.5, -23); g.stroke();
   g.restore();
 }
 function drawNanodisc(g, x, y, rot, s) {
@@ -810,9 +844,10 @@ function catchMem(m) {
   burst(m.x, memY(m) + (m.leaf === 'up' ? 24 : -24), MEM_COL[m.type], 12, 130);
   P.bounce = 1; cheer(P.x, 320);
   if (m.type === 'chol') {
-    const k = knockOff(1);
-    if (k) say(bx, by, 'Cholesterol knocked one off', C.chol, 26); else { G.score += 50; say(bx, by, 'Cholesterol +50', C.chol, 26); }
-    sfx(k ? 'thwack' : 'chol');
+    // cholesterol orders the bilayer around him: he diffuses faster for a few seconds
+    G.zoom = ZOOM_S;
+    say(bx, by, 'Cholesterol: diffuse faster!', C.chol, 26);
+    sfx('zoom');
   } else if (m.type === 'pip') {
     const u = G.plug > 0;
     if (u) unplug();
@@ -1003,6 +1038,16 @@ function drawProtein() {
     // nanodisc: MSP belts frame the patch of bilayer around him
     for (const sx of [-1, 1]) drawHelix(P.x + sx * 104, MC - 84 - P.lift, MC + 84 - P.lift, P.phase * 1.4 + sx, { amp: 11, pitch: 26, band: 14, lw: 2.6, front: C.msp, back: C.mspD });
   }
+  if (G.zoom > 0 && Math.abs(P.vx) > 80) {
+    // cholesterol boost: diffusion streaks trailing behind him in the bilayer
+    const dir = Math.sign(P.vx), sp = Math.min(1, Math.abs(P.vx) / (MAXV * ZOOM_X));
+    ctx.save(); ctx.strokeStyle = C.chol; ctx.lineCap = 'round'; ctx.lineWidth = 4;
+    [MC - 52, MC - 18, MC + 18, MC + 52].forEach((y, i) => {
+      const x0 = hx - dir * (64 + (i % 2) * 14), len = (60 + (i % 2) * 30) * sp, wob = Math.sin(time * 20 + i) * 6;
+      ctx.globalAlpha = 0.55; ctx.beginPath(); ctx.moveTo(x0, y - P.lift); ctx.lineTo(x0 - dir * (len + wob), y - P.lift); ctx.stroke();
+    });
+    ctx.restore();
+  }
   drawHelix(hx - 30, hy + 40, bot, P.phase);
   drawHelix(hx + 30, hy + 40, bot, P.phase + 1.3);
   // cargo travelling down the channel between the helices
@@ -1023,6 +1068,20 @@ function drawProtein() {
     blob(hx, hy, HEAD_R + 10, 1, 1); ctx.stroke(); ctx.globalAlpha = 1;
   }
   face(hx, hy);
+  if (G.hat > 0) {
+    // the ligand hat sits on his head; a little vortex shows it sucking
+    const e = 1 - Math.pow(1 - G.hatA, 3), blinkOff = G.hat < 2 && Math.floor(time * 8) % 2 === 1;
+    const top = hy - HEAD_R * 0.9 + 4, rot = -clamp(P.vx / MAXV, -1, 1) * 0.12 + Math.sin(time * 2.2) * 0.04;
+    if (G.mode === 'playing') {
+      ctx.save(); ctx.strokeStyle = C.hatB; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        const a0 = time * 4 + i * TAU / 3, r = 48 + Math.sin(time * 3 + i) * 4;
+        ctx.globalAlpha = 0.55 * e; ctx.beginPath(); ctx.arc(hx, top - 22, r, a0, a0 + 0.9); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (!blinkOff) drawHat(ctx, hx, top - (1 - e) * 60, 0.95 * (0.6 + 0.4 * e), rot);
+  }
   for (const c of cargo) { const p = cargoPos(c); if (p.front) drawCargo(ctx, c.kind, p.x, p.y, c.rot, 1); }
 }
 // Caught cargo: swept into the head, then down the channel and out into the cytoplasm
@@ -1063,6 +1122,7 @@ function drawItem(it) {
     case 'pip': drawPIP(ctx, it.x, it.y, it.rot, 1); break;
     case 'chol': drawChol(ctx, it.x, it.y, Math.sin(it.rot) * 0.5, 0.85); break;
     case 'nd': drawNanodisc(ctx, it.x, it.y, it.rot, 1.15); break;
+    case 'hat': drawHat(ctx, it.x, it.y + 13, 0.62, Math.sin(it.rot) * 0.3); break;
     case 'drug': drawDrug(ctx, it.x, it.y, it.rot, 1, t); break;
     case 'det': drawDetergent(ctx, it.x, it.y, it.hd, 1, t); break;
     case 'amp': drawAmphipol(ctx, chainPts(it, 12, 10), it.hd, t); break;
@@ -1078,7 +1138,12 @@ function burst(x, y, color, n, sp = 160) {
     parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, life: rnd(.45, .8), r: rnd(2.5, 5), c: color });
   }
 }
-function say(x, y, txt, color, size = 26) { texts.push({ x: clamp(x, 140, W - 140), y, txt, c: color, life: 1.2, size }); }
+function say(x, y, txt, color, size = 26) {
+  x = clamp(x, 140, W - 140);
+  // stack messages that pop up in the same spot instead of overprinting them
+  for (let i = 0; i < 4 && texts.some(t => t.life > 0.35 && Math.abs(t.x - x) < 160 && Math.abs(t.y - y) < size + 4); i++) y -= size + 6;
+  texts.push({ x, y, txt, c: color, life: 1.2, size });
+}
 function cheer(x, range) {
   for (const L of [lipU, lipL]) for (const l of L) {
     const d = Math.abs(l.x - x);
@@ -1087,7 +1152,7 @@ function cheer(x, range) {
 }
 function spawn() {
   const c = cfg(G.level);
-  const table = [['det', c.det], ['amp', c.amp], ['sma', c.sma], ['drug', c.drug], ['nd', c.nd], ['ion', 0.25]];
+  const table = [['det', c.det], ['amp', c.amp], ['sma', c.sma], ['drug', c.drug], ['nd', c.nd], ['hat', c.hat], ['ion', 0.25]];
   let r = Math.random(), type = 'lig';
   for (const [k, p] of table) { if (r < p) { type = k; break; } r -= p; }
   const n = type === 'det' ? 1 + (Math.random() < c.pair ? 1 : 0) + (Math.random() < c.triple ? 1 : 0)
@@ -1099,7 +1164,7 @@ function spawn() {
     items.push({ type, x0, x: x0, y: -40 - i * rnd(25, 70), vy, t: 0,
       wa: type === 'det' ? rnd(16, 34) : poly ? rnd(40, 70) : type === 'ion' ? rnd(8, 18) : rnd(6, 22), wf: poly ? rnd(1, 1.6) : rnd(1.2, 2.6), wp: rnd(0, TAU),
       rot: rnd(0, TAU), vr: rnd(-2, 2), hd: PI / 2, ion: Math.random() < 0.55 ? 'na' : 'cl',
-      r: { lig: 14, ion: 11, chol: 18, pip: 17, nd: 20, drug: 17, det: 15, amp: 15, sma: 16 }[type], dead: false });
+      r: { lig: 14, ion: 11, chol: 18, pip: 17, nd: 20, hat: 22, drug: 17, det: 15, amp: 15, sma: 16 }[type], dead: false });
   }
 }
 const multOf = c => 1 + Math.min(4, Math.floor(c / 5));
@@ -1123,6 +1188,12 @@ function knockOff(n) {
   }
   if (k) cheer(P.x, 320);
   return k;
+}
+const hatPos = () => ({ x: P.x, y: P.hy - HEAD_R - 18 });
+function hatOff() {
+  const h = hatPos();
+  flyers.push({ kind: 'hat', x: h.x, y: h.y, hd: 0, vx: (Math.random() < 0.5 ? -1 : 1) * rnd(90, 150), vy: -rnd(260, 320), vr: rnd(-5, 5), life: 1.3, g: 420, ph: 0 });
+  sfx('hatOff');
 }
 function unplug() {
   const y = P.hy + PLUG_DY;
@@ -1161,6 +1232,11 @@ function collect(it) {
     P.hurtT = 0.5; P.catchT = 0; G.shake = reduce ? 0 : 8;
     say(P.x, P.hy - 112, fresh ? 'Drug plugged your pore!' : 'Another drug! Timer reset', C.drug, 28);
     sfx('plug');
+  } else if (it.type === 'hat') {
+    if (G.hat <= 0) G.hatA = 0;
+    G.hat = HAT_S;
+    say(it.x, it.y - 12, 'Ligand hat: suction on!', C.ink, 28);
+    burst(it.x, it.y, C.hatB, 16); cheer(P.x, 420); sfx('hat'); P.catchT = 0.45; P.bounce = 1;
   } else if (it.type === 'nd') {
     G.shield = SHIELD_S;
     say(it.x, it.y - 12, 'Nanodisc shield', C.mspD, 28);
@@ -1201,13 +1277,14 @@ function miss(it) {
       if (holes.length > 3) holes.shift();
     } else burst(it.x, y, C.sma, 10, 120);
   } else {
-    const col = { amp: C.amp, chol: C.chol, pip: C.pip, nd: C.msp, drug: C.drug, ion: C[it.ion] }[it.type] || C.muted;
+    const col = { amp: C.amp, chol: C.chol, pip: C.pip, nd: C.msp, hat: C.hatB, drug: C.drug, ion: C[it.ion] }[it.type] || C.muted;
     burst(it.x, y, col, 8, 100);
     if (it.type === 'amp') sfx('squelch');
   }
 }
 const TIPS = [
-  'Cholesterol knocks one baddie off your legs. PIP₂ knocks off two.',
+  'Cholesterol makes you diffuse faster for 5 seconds. PIP₂ knocks off two baddies.',
+  'A ligand hat sucks nearby solutes and ions straight to you.',
   'Lipids only stay for a few seconds. Watch the timer and get there first.',
   'GM3 doubles every solute and ion you carry for 8 seconds.',
   'A drug in your pore stops all transport. PIP₂ pops it straight out.',
@@ -1231,6 +1308,7 @@ function endGame() {
     show('over');
   }, 2000);
 }
+
 function show(id) {
   for (const o of ['menu', 'pause', 'over']) $('#' + o).hidden = o !== id;
   if (id) { const b = $('#' + id + ' .btn'); if (b) b.focus({ preventScroll: true }); }
@@ -1252,7 +1330,7 @@ function setDiff(d) {
   syncModes();
 }
 function startGame() {
-  Object.assign(G, { mode: 'playing', score: 0, combo: 0, solutes: 0, ions: 0, t: 0, level: 1, levelT: 0, spawnIn: 1.2, shield: 0, boost: 0, memIn: 4, plug: 0, plugA: 1 });
+  Object.assign(G, { mode: 'playing', score: 0, combo: 0, solutes: 0, ions: 0, t: 0, level: 1, levelT: 0, spawnIn: 1.2, shield: 0, boost: 0, memIn: 4, plug: 0, plugA: 1, hat: 0, hatA: 1, zoom: 0 });
   items = []; parts = []; texts = []; inserted = []; attached = []; flyers = []; holes = []; cargo = []; released = []; memItems = [];
   P.hurtT = 0; P.catchT = 0; P.lift = 0; inputMode = 'none';
   banner(1);
@@ -1265,7 +1343,7 @@ function update(dt) {
   if (G.mode === 'paused') return;
   time += dt;
   const playing = G.mode === 'playing', over = G.mode === 'over';
-  const vmax = MAXV * (attached.some(a => a.kind === 'amp') ? 0.62 : 1);
+  const vmax = MAXV * (attached.some(a => a.kind === 'amp') ? 0.62 : 1) * (G.zoom > 0 ? ZOOM_X : 1);
   let desired = 0;
   const dir = (keys.r ? 1 : 0) - (keys.l ? 1 : 0);
   if (playing) {
@@ -1345,6 +1423,9 @@ function update(dt) {
   if (playing) {
     G.t += dt;
     G.boost = Math.max(0, G.boost - dt);
+    G.zoom = Math.max(0, G.zoom - dt);
+    G.hatA = Math.min(1, G.hatA + dt / 0.3);
+    if (G.hat > 0) { G.hat -= dt; if (G.hat <= 0) { G.hat = 0; hatOff(); } }
     if (G.plug > 0) {
       G.plugA = Math.min(1, G.plugA + dt / 0.3);
       G.plug -= dt;
@@ -1373,8 +1454,21 @@ function update(dt) {
   }
 
   let near = null, nd = 1e9, foeNear = 1e9;
+  const hp = hatPos(), sucking = playing && G.hat > 0;
   for (const it of items) {
     it.t += dt; it.y += it.vy * dt;
+    it.sucked = false;
+    if (sucking && !it.dead && (it.type === 'lig' || it.type === 'ion')) {
+      // ligand hat: pull nearby solutes and ions in towards the hat, harder the closer they are
+      const dx = hp.x - it.x, dy = hp.y - it.y, d = Math.hypot(dx, dy) || 1;
+      if (d < HAT_RANGE) {
+        const s = 90 + 380 * (1 - d / HAT_RANGE);
+        it.x0 += dx / d * s * dt; it.y += dy / d * s * dt * 0.8;
+        it.wa *= 1 - Math.min(1, dt * 2);
+        it.sucked = true;
+        if (d < 34 + it.r) { it.x = it.x0; collect(it); continue; }
+      }
+    }
     it.x = it.x0 + Math.sin(it.t * it.wf + it.wp) * it.wa;
     const foe = it.type === 'det' || it.type === 'amp' || it.type === 'sma';
     if (foe) it.hd = Math.atan2(it.vy, it.wa * it.wf * Math.cos(it.t * it.wf + it.wp));
@@ -1431,11 +1525,19 @@ function draw() {
     if (f.kind === 'det') drawDetergent(ctx, f.x, f.y, f.hd, 0.95, time + f.ph);
     else if (f.kind === 'smalp') drawSMALP(ctx, f.x, f.y, time + f.ph);
     else if (f.kind === 'drug') drawDrug(ctx, f.x, f.y, f.hd, 1.05, time);
+    else if (f.kind === 'hat') drawHat(ctx, f.x, f.y, 0.9, f.hd);
     else if (f.kind === 'lig' || f.kind === 'na' || f.kind === 'cl') drawCargo(ctx, f.kind, f.x, f.y, f.hd, 1);
     else if (f.kind === 'amp') drawAmphipol(ctx, localChain(f.x, f.y, f.hd, 9, 10, time + f.ph), f.hd, time + f.ph);
     else if (f.kind === 'sma') drawSMA(ctx, localChain(f.x, f.y, f.hd, 8, 11, time + f.ph), f.hd, time + f.ph);
   }
   ctx.globalAlpha = 1;
+  if (G.hat > 0) {
+    // dashed suction lines from each captured solute/ion to the hat
+    const hp = hatPos();
+    ctx.save(); ctx.strokeStyle = C.hatB; ctx.lineWidth = 2.5; ctx.setLineDash([6, 9]); ctx.lineDashOffset = -time * 80;
+    for (const it of items) if (it.sucked) { ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.moveTo(it.x, it.y); ctx.lineTo(hp.x, hp.y); ctx.stroke(); }
+    ctx.restore();
+  }
   for (const it of items) drawItem(it);
 
   ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2;
@@ -1488,6 +1590,10 @@ function hud() {
   if (G.shield > 0) { sh.hidden = false; $('#shieldbar').style.width = (G.shield / SHIELD_S * 100) + '%'; } else if (!sh.hidden) sh.hidden = true;
   const pl = $('#plug');
   if (G.plug > 0 && G.mode !== 'over') { pl.hidden = false; $('#plugbar').style.width = (G.plug / PLUG_S * 100) + '%'; } else if (!pl.hidden) pl.hidden = true;
+  const hp = $('#hatPill');
+  if (G.hat > 0 && G.mode !== 'over') { hp.hidden = false; $('#hatbar').style.width = (G.hat / HAT_S * 100) + '%'; } else if (!hp.hidden) hp.hidden = true;
+  const zp = $('#zoomPill');
+  if (G.zoom > 0 && G.mode !== 'over') { zp.hidden = false; $('#zoombar').style.width = (G.zoom / ZOOM_S * 100) + '%'; } else if (!zp.hidden) zp.hidden = true;
   const bo = $('#boost');
   if (G.boost > 0 && G.mode !== 'over') { bo.hidden = false; $('#boostbar').style.width = (G.boost / BOOST_S * 100) + '%'; } else if (!bo.hidden) bo.hidden = true;
   const pb = $('#pauseBtn'), active = G.mode === 'playing' || G.mode === 'paused';
@@ -1551,6 +1657,7 @@ document.querySelectorAll('canvas.ico').forEach(c => {
   else if (k === 'chol') drawChol(g, 18, 10, 0.15, 0.54);
   else if (k === 'pip') drawPIP(g, 21, 18, 0, 0.76);
   else if (k === 'nd') drawNanodisc(g, 21, 21, 0, 1.0);
+  else if (k === 'hat') drawHat(g, 21, 31, 0.5, -0.1);
   else if (k === 'gm3') drawGM3(g, 17, 30, 0.6, 0, 20);
   else if (k === 'drug') drawDrug(g, 21, 21, -0.5, 1.0, 0);
   else if (k === 'det') drawDetergent(g, 28, 27, 0.55, 0.53, 0.4);
@@ -1590,4 +1697,5 @@ window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.
 })();
 </script>
 
-</body></html>
+</body>
+</html>
