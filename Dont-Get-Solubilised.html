@@ -23,7 +23,7 @@
   --msp:#38b2a3;
   --gm3:#a54399;
   --drug:#3b4a8c;
-  --hat:#e9b923;
+  --hat:#4b74d6;
   --chol:#e0262a;
   --danger:#d8262a;
   --danger-bg:#f6e0df;
@@ -121,7 +121,7 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
       <div id="meter" class="meter" role="img" aria-label="0 of 10 bound"></div>
       <div id="shield" class="pill" hidden><span>Nanodisc</span><i><b id="shieldbar"></b></i></div>
       <div id="boost" class="pill gm3" hidden><span>GM3 ×2</span><i><b id="boostbar"></b></i></div>
-      <div id="hatPill" class="pill hat" hidden><span>Ligand hat</span><i><b id="hatbar"></b></i></div>
+      <div id="hatPill" class="pill hat" hidden><span>Binding protein</span><i><b id="hatbar"></b></i></div>
       <div id="zoomPill" class="pill chol" hidden><span>Faster</span><i><b id="zoombar"></b></i></div>
       <div id="plug" class="pill drug" hidden><span>Pore blocked</span><i><b id="plugbar"></b></i></div>
     </div>
@@ -148,7 +148,7 @@ body{margin:0;background:var(--frame);color:var(--ink);font-family:var(--font-bo
           <div class="item"><canvas class="ico" data-k="lig" width="84" height="84"></canvas><span><strong>Solute</strong>Carry it through, +10</span></div>
           <div class="item"><canvas class="ico" data-k="ion" width="84" height="84"></canvas><span><strong>Ion</strong>Na⁺ or Cl⁻, carry it through, +5</span></div>
           <div class="item"><canvas class="ico" data-k="nd" width="84" height="84"></canvas><span><strong>Nanodisc</strong>Shield for 10 s</span></div>
-          <div class="item"><canvas class="ico" data-k="hat" width="84" height="84"></canvas><span><strong>Ligand hat</strong>Sucks solutes and ions to you for 8 s</span></div>
+          <div class="item"><canvas class="ico" data-k="hat" width="84" height="84"></canvas><span><strong>Binding protein</strong>Docks on your head and snaps up solutes and ions for 8 s</span></div>
         </div>
         <div class="lg">
           <div class="lbl">Grab in the membrane</div>
@@ -201,7 +201,7 @@ const C = {
   ink:'#1b1d1a', leaf:'#4f9a17', leafD:'#3a7311', lipid:'#7aa6da', tail:'#6c9bd2',
   chol:'#e0262a', pip:'#f2a23a', pipP:'#ffd84a', lig:'#ffc83a', oxy:'#e8513a',
   det:'#c9a5ca', detD:'#5a4466', amp:'#d4559b', ampD:'#9c2f6b', sma:'#8f979e', smaD:'#555c62',
-  msp:'#38b2a3', mspD:'#22786d', na:'#9ad6e8', cl:'#a6dd8a', glc:'#0072bc', gal:'#ffd400', sia:'#a54399', drug:'#3b4a8c', hatC:'#343743', hatB:'#e9b923', paper:'#ececea', muted:'#6b7268', white:'#fbfbf7',
+  msp:'#38b2a3', mspD:'#22786d', na:'#9ad6e8', cl:'#a6dd8a', glc:'#0072bc', gal:'#ffd400', sia:'#a54399', drug:'#3b4a8c', hatB:'#4b74d6', sbp1:'#4b74d6', sbpIn:'#1d2b5c', paper:'#ececea', muted:'#6b7268', white:'#fbfbf7',
   water:'#6a8fbd', tongue:'#e46a6a'
 };
 const MAX_DET = 10, SHIELD_S = 10, BOOST_S = 8, PLUG_S = 10, PLUG_DY = 140, BIND_S = 5;
@@ -281,7 +281,7 @@ let W = 960, H = 600, scale = 1, ox = 0, oy = 0, dpr = 1, MC = 430, HY = 272;
 const MAXV = 560, HEAD_R = 80;
 const P = { x:480, tx:480, vx:0, phase:0, catchT:0, hurtT:0, blinkIn:2.5, blink:0,
   lookX:0, lookY:0, worry:0, aL:-0.3, aR:-0.3, hy:272, bounce:0, lift:0, hands:[{x:0,y:0},{x:0,y:0}] };
-const G = { mode:'menu', score:0, combo:0, solutes:0, ions:0, t:0, level:1, levelT:0, banner:null, spawnIn:1, shield:0, boost:0, hat:0, hatA:1, zoom:0, memIn:5, plug:0, plugA:1, plugFx:0, plugFy:0, plugAng:0, blockMsgT:0, snapT:0,
+const G = { mode:'menu', score:0, combo:0, solutes:0, ions:0, t:0, level:1, levelT:0, banner:null, spawnIn:1, shield:0, boost:0, hat:0, hatA:1, hatSnap:0, zoom:0, memIn:5, plug:0, plugA:1, plugFx:0, plugFy:0, plugAng:0, blockMsgT:0, snapT:0,
   push:0, gap:1, instab:0, best:0, shake:0 };
 let items = [], parts = [], texts = [], lipU = [], lipL = [], water = [], inserted = [], attached = [], flyers = [], holes = [];
 let cargo = [], released = [], memItems = [];
@@ -544,17 +544,37 @@ function drawGM3(g, x, y, s, t, tl = 58) {
   g.strokeStyle = C.white; g.lineWidth = 1.5; g.beginPath(); arcS(g, 0, 0.5, 3.6, 0.15 * PI, 0.85 * PI); g.stroke();
   g.restore();
 }
-// Ligand hat: a top hat with a little fused-ring ligand printed on its band. (x, y) is the middle of the brim.
-function drawHat(g, x, y, s, rot) {
+// Ligand hat: a substrate-binding protein (SBP), drawn as one chomping character docked on his extracellular face
+// the way binding proteins dock on ABC importers. Its binding cleft is its mouth: it snaps shut on a catch
+// (the Venus flytrap) and opens again. (x, y) is where it sits on his head; close runs 0 (open) → 1 (shut).
+function drawHat(g, x, y, s, rot, t = time, close = 0) {
+  const open = (1 - close) * (0.85 + Math.sin(t * 2.6) * 0.15), gap = 3 + open * 15, tip = open * 5;
   g.save(); g.translate(x, y); g.rotate(rot); g.scale(s, s);
-  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = C.ink; g.lineWidth = 3;
-  g.fillStyle = C.hatC; g.beginPath(); g.ellipse(0, 0, 40, 8, 0, 0, TAU); g.fill(); g.stroke();
-  g.beginPath(); g.moveTo(-24, 0); g.lineTo(-27, -48); g.quadraticCurveTo(0, -53, 27, -48); g.lineTo(24, 0); g.quadraticCurveTo(0, 5, -24, 0); g.closePath(); g.fill(); g.stroke();
-  g.fillStyle = '#4b4f5c'; g.beginPath(); g.ellipse(0, -49, 27, 6, 0, 0, TAU); g.fill(); g.stroke();
-  g.fillStyle = C.hatB; g.beginPath(); g.moveTo(-24.5, -5); g.lineTo(-25.5, -18); g.quadraticCurveTo(0, -21, 25.5, -18); g.lineTo(24.5, -5); g.quadraticCurveTo(0, -2, -24.5, -5); g.closePath(); g.fill(); g.stroke();
-  g.lineWidth = 1.5;
-  for (const cx of [-7.3, 0, 7.3]) { hexAt(g, cx, -11.5, 4.2, PI / 6); g.stroke(); }
-  g.strokeStyle = 'rgba(255,255,255,0.28)'; g.lineWidth = 3; g.beginPath(); g.moveTo(-17, -42); g.lineTo(-18.5, -23); g.stroke();
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  const mouth = () => { g.moveTo(-gap * 0.35, -40 + tip); g.bezierCurveTo(-gap, -32, -gap * 0.6, -22, 0, -18); g.bezierCurveTo(gap * 0.6, -22, gap, -32, gap * 0.35, -40 + tip); };
+  // body: one broad bean with the cleft at the top
+  g.beginPath(); mouth();
+  g.bezierCurveTo(gap * 0.35 + 9, -47, 40 + open * 3, -44, 41 + open * 2, -24);
+  g.bezierCurveTo(42, -6, 25, 3, 0, 3);
+  g.bezierCurveTo(-25, 3, -42, -6, -41 - open * 2, -24);
+  g.bezierCurveTo(-40 - open * 3, -44, -gap * 0.35 - 9, -47, -gap * 0.35, -40 + tip);
+  g.closePath();
+  g.fillStyle = C.sbp1; g.fill(); g.strokeStyle = C.ink; g.lineWidth = 3; g.stroke();
+  // inside of the cleft, with the substrate it has just caught
+  if (open > 0.15) { g.beginPath(); mouth(); g.closePath(); g.fillStyle = C.sbpIn; g.fill(); }
+  if (close > 0.15 || open <= 0.15) { g.fillStyle = C.lig; g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.arc(0, -27, 5.5, 0, TAU); g.fill(); g.stroke(); }
+  // a helix squiggle on each lobe, so it reads as protein
+  g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 2.2;
+  for (const sx of [-1, 1]) {
+    g.beginPath();
+    for (let i = 0; i <= 14; i++) { const u = i / 14, px = sx * (14 + u * 18), py = -6 - u * 6 + Math.sin(u * TAU * 2.2) * 2.4; i ? g.lineTo(px, py) : g.moveTo(px, py); }
+    g.stroke();
+  }
+  // big eyes
+  for (const sx of [-1, 1]) {
+    g.fillStyle = '#fff'; g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.arc(sx * 21, -28, 6.5, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = C.ink; g.beginPath(); g.arc(sx * 21 + sx * 1.5, -27, 3, 0, TAU); g.fill();
+  }
   g.restore();
 }
 function drawNanodisc(g, x, y, rot, s) {
@@ -1080,7 +1100,8 @@ function drawProtein() {
       }
       ctx.restore();
     }
-    if (!blinkOff) drawHat(ctx, hx, top - (1 - e) * 60, 0.95 * (0.6 + 0.4 * e), rot);
+    const snap = G.hatSnap > 0.7 ? (1 - G.hatSnap) / 0.3 : G.hatSnap / 0.7;   // shut fast, reopen slowly
+    if (!blinkOff) drawHat(ctx, hx, top - (1 - e) * 60, 0.95 * (0.6 + 0.4 * e), rot, time, snap);
   }
   for (const c of cargo) { const p = cargoPos(c); if (p.front) drawCargo(ctx, c.kind, p.x, p.y, c.rot, 1); }
 }
@@ -1235,7 +1256,7 @@ function collect(it) {
   } else if (it.type === 'hat') {
     if (G.hat <= 0) G.hatA = 0;
     G.hat = HAT_S;
-    say(it.x, it.y - 12, 'Ligand hat: suction on!', C.ink, 28);
+    say(it.x, it.y - 12, 'Binding protein docked!', C.ink, 28);
     burst(it.x, it.y, C.hatB, 16); cheer(P.x, 420); sfx('hat'); P.catchT = 0.45; P.bounce = 1;
   } else if (it.type === 'nd') {
     G.shield = SHIELD_S;
@@ -1284,7 +1305,7 @@ function miss(it) {
 }
 const TIPS = [
   'Cholesterol makes you diffuse faster for 5 seconds. PIP₂ knocks off two baddies.',
-  'A ligand hat sucks nearby solutes and ions straight to you.',
+  'The binding protein docks on top, like those of ABC importers, and snaps up nearby solutes and ions in its flytrap cleft.',
   'Lipids only stay for a few seconds. Watch the timer and get there first.',
   'GM3 doubles every solute and ion you carry for 8 seconds.',
   'A drug in your pore stops all transport. PIP₂ pops it straight out.',
@@ -1330,7 +1351,7 @@ function setDiff(d) {
   syncModes();
 }
 function startGame() {
-  Object.assign(G, { mode: 'playing', score: 0, combo: 0, solutes: 0, ions: 0, t: 0, level: 1, levelT: 0, spawnIn: 1.2, shield: 0, boost: 0, memIn: 4, plug: 0, plugA: 1, hat: 0, hatA: 1, zoom: 0 });
+  Object.assign(G, { mode: 'playing', score: 0, combo: 0, solutes: 0, ions: 0, t: 0, level: 1, levelT: 0, spawnIn: 1.2, shield: 0, boost: 0, memIn: 4, plug: 0, plugA: 1, hat: 0, hatA: 1, hatSnap: 0, zoom: 0 });
   items = []; parts = []; texts = []; inserted = []; attached = []; flyers = []; holes = []; cargo = []; released = []; memItems = [];
   P.hurtT = 0; P.catchT = 0; P.lift = 0; inputMode = 'none';
   banner(1);
@@ -1425,6 +1446,7 @@ function update(dt) {
     G.boost = Math.max(0, G.boost - dt);
     G.zoom = Math.max(0, G.zoom - dt);
     G.hatA = Math.min(1, G.hatA + dt / 0.3);
+    G.hatSnap = Math.max(0, G.hatSnap - dt / 0.45);
     if (G.hat > 0) { G.hat -= dt; if (G.hat <= 0) { G.hat = 0; hatOff(); } }
     if (G.plug > 0) {
       G.plugA = Math.min(1, G.plugA + dt / 0.3);
@@ -1466,7 +1488,7 @@ function update(dt) {
         it.x0 += dx / d * s * dt; it.y += dy / d * s * dt * 0.8;
         it.wa *= 1 - Math.min(1, dt * 2);
         it.sucked = true;
-        if (d < 34 + it.r) { it.x = it.x0; collect(it); continue; }
+        if (d < 34 + it.r) { it.x = it.x0; G.hatSnap = 1; collect(it); continue; }
       }
     }
     it.x = it.x0 + Math.sin(it.t * it.wf + it.wp) * it.wa;
