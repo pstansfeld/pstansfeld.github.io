@@ -1198,7 +1198,24 @@ function stepTweens(now) {
 
 /* ---------- VR (WebXR): the same game, picked up with a Quest controller ----------
    Nothing here runs on a laptop: the Enter VR button only appears when the browser offers immersive VR. */
-let xrSession = null, xrHand = null, hapT = 0;
+let xrSession = null, xrHand = null, hapT = 0, xrPreview = false;
+const VR_SKY = new THREE.Color(0xcfd8de);
+const vrFloor = new THREE.Mesh(new THREE.CircleGeometry(3, 48), new THREE.MeshLambertMaterial({ color: 0xb9c2b4 }));
+vrFloor.rotation.x = -Math.PI / 2; vrFloor.visible = false; scene.add(vrFloor);
+/* The game works in ångströms (camera clips at 2–1500 units). In VR, three.js hands the camera's clip planes to the
+   headset in metres, so a 2 m near plane cut away the protein and the controllers and left a blank screen.
+   Entering VR shrinks the protein to tabletop size and switches to metre-scale clip planes; leaving restores both. */
+function enterXRWorld() {
+  const sc = 0.6 / (2 * geo.boundingSphere.radius); // about 60 cm across, in front of you at chest height
+  for (const g of [world, oworld]) { g.scale.setScalar(sc); g.position.set(0, 1.1, -0.6); }
+  camera.near = 0.01; camera.far = 40; camera.updateProjectionMatrix();
+  vrFloor.visible = true;
+}
+function exitXRWorld() {
+  for (const g of [world, oworld]) { g.scale.setScalar(1); g.position.set(0, 0, 0); }
+  camera.near = 2; camera.far = 1500; camera.fov = 35; camera.updateProjectionMatrix();
+  vrFloor.visible = false;
+}
 const xrOff = new THREE.Matrix4(), xm = new THREE.Matrix4(), xm2 = new THREE.Matrix4(), xp = new THREE.Vector3(), xq = new THREE.Quaternion(), xs = new THREE.Vector3();
 const ctrls = renderer.xr && renderer.xr.getController ? [0, 1].map(i => {
   const c = renderer.xr.getController(i);
@@ -1263,16 +1280,14 @@ async function toggleXR() {
     renderer.xr.setReferenceSpaceType("local-floor");
     await renderer.xr.setSession(sess);
     xrSession = sess; sess.addEventListener("end", onXREnd);
-    // the protein shrinks to about 60 cm across, in front of you at chest height
-    const sc = 0.6 / (2 * geo.boundingSphere.radius);
-    for (const g of [world, oworld]) { g.scale.setScalar(sc); g.position.set(0, 1.1, -0.6); }
+    enterXRWorld();
     controls.enabled = false; clearLabels(); $("#bVR").textContent = "Exit VR";
     if (cur && !revealed) { xrStartPose(cur); vel.set(0, 0, 0); settle = 0; updateFit(); }
   } catch (e) { toast("Couldn't start VR on this device."); }
 }
 function onXREnd() {
   xrSession = null; if (xrHand) xrRelease(xrHand);
-  for (const g of [world, oworld]) { g.scale.setScalar(1); g.position.set(0, 0, 0); }
+  exitXRWorld();
   controls.enabled = true; $("#bVR").textContent = "Enter VR"; dirty = true;
   if (cur && !revealed) { startPose(cur); updateFit(); }
 }
@@ -1305,12 +1320,12 @@ function frame(now) {
   haptics(now);
   rattle(now);
   coach(now);
-  if (renderer.xr && renderer.xr.isPresenting) {
+  if ((renderer.xr && renderer.xr.isPresenting) || xrPreview) {
     // the headset needs a frame every time; the outline pass is screen-only, so draw the scene directly
     if (fitDirty) { updateFit(); fitDirty = false; }
     stepBurst();
     if (cur) { cur.ghost.position.copy(cur.group.position); cur.ghost.quaternion.copy(cur.group.quaternion); }
-    renderer.setRenderTarget(null); renderer.setClearColor(T.stage, 1);
+    renderer.setRenderTarget(null); renderer.setClearColor(VR_SKY, 1);
     renderer.autoClear = true; renderer.render(scene, camera);
     renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
     return;
@@ -1352,6 +1367,7 @@ function applyLevel(L) {
   lc = centroid(L.ligand.xyz);
   DF = buildDF(); buildProtein(L); buildMols(L); buildContacts(L);
   SUCK_R = Math.max(9, reachDistance(MOLS.find(m => m.type === "ligand")) + 3);
+  if (xrSession || xrPreview) enterXRWorld();
   camera.position.set(0, 0, fitDistance()); controls.target.set(0, 0, 0); controls.update(); camera.updateMatrixWorld();
   renderEyebrow(); renderTray(); newRound(); updateScores();
   try { localStorage.setItem("ass-level", L.pdb); } catch (e) {}
@@ -1378,7 +1394,14 @@ function start(saved) {
   setupXR();
   let last = null; try { last = localStorage.getItem("ass-level"); } catch (e) {}
   if (last && last !== D.first.pdb && LEVELS.some(l => l.pdb === last)) openLevel(last);
-  window.__dock = { get MOLS() { return MOLS; }, submit, worldAtoms, get cur() { return cur; }, fit: () => fitState, warm: () => warm, trySnap, updateFit, physics, contactT, dfAt, get snapped() { return snapped; }, startDrag: (t) => { drag = { id: -1, rot: false, bias: 0, target: t }; snapped = false; hasMoved = true; }, endDrag: () => releaseDrag(), get suck() { return suck; }, get SITE_FAR() { return SITE_FAR; }, get SUCK_R() { return SUCK_R; }, get round() { return round; }, xr: { ctrls, grab: xrGrab, release: xrRelease, world, get hand() { return xrHand; } }, select: (id) => select(MOLS.find(m => m.id === id), true), applyLevel, openLevel, get LV() { return LV; }, get ligandId() { return LV.ligand.code; } };
+  window.__dock = { get MOLS() { return MOLS; }, submit, worldAtoms, get cur() { return cur; }, fit: () => fitState, warm: () => warm, trySnap, updateFit, physics, contactT, dfAt, get snapped() { return snapped; }, startDrag: (t) => { drag = { id: -1, rot: false, bias: 0, target: t }; snapped = false; hasMoved = true; }, endDrag: () => releaseDrag(), get suck() { return suck; }, get SITE_FAR() { return SITE_FAR; }, get SUCK_R() { return SUCK_R; }, get round() { return round; }, xr: { ctrls, grab: xrGrab, release: xrRelease, world, get hand() { return xrHand; },
+    preview(opts = {}) {
+      xrPreview = true; enterXRWorld(); controls.enabled = false; clearLabels();
+      if (opts.near) { camera.near = opts.near; }
+      camera.fov = 90; camera.aspect = stage.clientWidth / stage.clientHeight; camera.updateProjectionMatrix();
+      camera.position.set(0, 1.45, 0.05); camera.lookAt(0, 1.1, -0.6); camera.updateMatrixWorld(true);
+      if (cur) { xrStartPose(cur); updateFit(); }
+    } }, select: (id) => select(MOLS.find(m => m.id === id), true), applyLevel, openLevel, get LV() { return LV; }, get ligandId() { return LV.ligand.code; } };
 }
 window.claude?.hot?.snapshot?.(() => ({ cur: cur && cur.id }));
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
