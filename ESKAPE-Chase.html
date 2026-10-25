@@ -1,0 +1,965 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ESKAPE Chase</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@1,6..72,500&display=swap" rel="stylesheet">
+<style>
+/* Layout: microscope bench. The bright Gram-stain field is the stage; the lab notebook sits beside it. */
+:root{
+  --bench:#191e2b;
+  --panel:#212839;
+  --rule:#333e57;
+  --ink:#e9ebf2;
+  --muted:#9ba4b9;
+  --violet:#a477e6;   /* crystal violet, lifted for a dark ground */
+  --safranin:#f07597; /* safranin counterstain */
+  --teal:#35bfb0;
+  --field:#eaeef4;
+  --bezel:#283044;
+  --f-display:"Bungee","Arial Black",Impact,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --f-latin:"Newsreader",Georgia,"Times New Roman",serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--bench)}
+body{background:var(--bench);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:22px 40px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:36px;align-items:start}
+@media (max-width:940px){.wrap{grid-template-columns:minmax(0,1fr);max-width:600px}}
+
+.play{display:flex;flex-direction:column;gap:14px;min-width:0}
+.mast{display:flex;flex-direction:column;gap:6px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(30px,6.4vw,42px);line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
+h1 .gp{color:var(--violet)} h1 .gn{color:var(--safranin)}
+.sub{margin:0;color:var(--muted);font-size:14px;max-width:60ch}
+
+.hud{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 24px}
+.stat{display:flex;flex-direction:column;gap:3px}
+.lbl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.val{font-family:var(--f-mono);font-weight:600;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.1}
+.lives{display:flex;gap:5px;height:22px;align-items:center}
+.lives svg{width:26px;height:13px;display:block}
+.tools{margin-left:auto;display:flex;gap:8px}
+.btn{font:500 13px/1 var(--f-body);color:var(--ink);background:transparent;border:1px solid var(--rule);border-radius:8px;padding:9px 12px;cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,.cta:focus-visible,.pad button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+
+.stage{position:relative;border-radius:16px;overflow:hidden;background:var(--field);
+  box-shadow:0 0 0 1px #0c1019,0 0 0 7px var(--bezel),0 20px 44px rgba(0,0,0,.5);margin:7px}
+canvas#board{display:block;width:100%;touch-action:none;user-select:none;-webkit-user-select:none}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:14px;overflow:auto;background:rgba(17,21,32,.6);backdrop-filter:blur(2px)}
+.card{width:min(100%,390px);background:var(--panel);border:1px solid var(--rule);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.card h2{font-family:var(--f-display);font-weight:400;font-size:24px;line-height:1.05;margin:0;text-wrap:balance}
+.card p{margin:0;font-size:14px;color:var(--ink);opacity:.9}
+.card .hint{font-size:12.5px;color:var(--muted);opacity:1}
+.cta{font:600 15px/1 var(--f-body);background:var(--teal);color:#062520;border:0;border-radius:10px;padding:13px 16px;cursor:pointer}
+.cta:hover{filter:brightness(1.08)}
+.overstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.overstats .val{font-size:18px}
+.fact{border-left:2px solid var(--violet);padding-left:10px;font-size:13px!important;color:var(--muted)!important}
+@media (max-width:420px){.card{padding:16px;gap:10px}.card h2{font-size:20px}.card p{font-size:13px}}
+
+.pad{display:none;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,58px);gap:8px;justify-content:center;margin-top:4px}
+.pad button{font:600 20px/1 var(--f-body);color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:12px;touch-action:none}
+.pad button:active{background:var(--rule)}
+.pad .u{grid-column:2;grid-row:1}.pad .l{grid-column:1;grid-row:2}.pad .d{grid-column:2;grid-row:2}.pad .r{grid-column:3;grid-row:2}
+@media (hover:none) and (pointer:coarse){.pad{display:grid}.keys{display:none}}
+.keys{margin:0;font-size:12.5px;color:var(--muted)}
+
+.notebook{display:flex;flex-direction:column;gap:28px;min-width:0;padding-top:6px}
+h2.sec{font:600 12px/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.roster{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.org{display:grid;grid-template-columns:46px minmax(0,1fr) 96px;gap:12px;align-items:start;padding:11px 0;border-bottom:1px solid var(--rule)}
+.ico{width:46px;height:46px;border-radius:50%;background:var(--field);display:block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+.bin{font-family:var(--f-latin);font-style:italic;font-weight:500;font-size:17px;line-height:1.2}
+.gram{display:inline-block;font:600 10.5px/1 var(--f-mono);padding:3px 6px;border-radius:999px;margin-left:8px;vertical-align:2px}
+.gram.pos{color:var(--violet);background:rgba(164,119,230,.16)}
+.gram.neg{color:var(--safranin);background:rgba(240,117,151,.15)}
+.mech{margin:3px 0 0;font-size:13px;opacity:.88}
+.act{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+.state{display:flex;flex-direction:column;align-items:flex-end;gap:7px;padding-top:4px}
+.pips{display:flex;gap:4px}
+.pips i{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--rule)}
+.pips i.on{background:var(--c);border-color:var(--c)}
+.status{font:500 11px/1 var(--f-mono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.status.live{color:var(--ink)} .status.weak{color:var(--teal)} .status.hot{color:var(--safranin)} .status.dead{opacity:.6}
+@media (max-width:440px){.org{grid-template-columns:46px minmax(0,1fr)}.state{grid-column:2;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding-top:0}}
+
+.rules{margin:0;display:flex;flex-direction:column;gap:11px}
+.rules dt{font-weight:600;font-size:14px}
+.rules dd{margin:2px 0 0;color:var(--muted);font-size:13.5px;max-width:62ch}
+.score-line{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin:12px 0 0;font-variant-numeric:tabular-nums}
+
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;font-size:13.5px}
+.log li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:8px}
+.log .stamp{font:500 11px/1.9 var(--f-mono);color:var(--muted)}
+.log .empty{display:block;color:var(--muted)}
+.log li:first-child:not(.empty){color:var(--ink)}
+.log li:not(:first-child){color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <main class="play">
+    <header class="mast">
+      <h1><span class="gp">ES</span><span class="gn">KAPE</span> Chase</h1>
+      <p class="sub">One β-lactam capsule against the six hospital pathogens best at escaping antibiotics.</p>
+    </header>
+
+    <div class="hud">
+      <div class="stat"><span class="lbl">Score</span><span class="val" id="score">0</span></div>
+      <div class="stat"><span class="lbl">Best</span><span class="val" id="best">0</span></div>
+      <div class="stat"><span class="lbl">Plate</span><span class="val" id="plate">1</span></div>
+      <div class="stat"><span class="lbl">Courses</span><span class="lives" id="lives"></span></div>
+      <div class="tools">
+        <button class="btn" id="pauseBtn" type="button" disabled>Pause</button>
+        <button class="btn" id="soundBtn" type="button">Sound on</button>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="board" role="img" aria-label="Game board: a maze on a microscope field"></canvas>
+      <div class="overlay" id="titleOv">
+        <div class="card">
+          <h2>Start the course</h2>
+          <p>Eat the susceptible cocci. A combination dose makes the ESKAPE bacteria vulnerable for a few seconds. Lyse them before it wears off: survivors come back more resistant.</p>
+          <button class="cta" id="startBtn" type="button">Start treatment</button>
+          <p class="hint">Arrow keys or WASD · swipe on touch · P pauses · M mutes</p>
+        </div>
+      </div>
+      <div class="overlay" id="overOv" hidden>
+        <div class="card">
+          <h2 id="overTitle">Infection persists</h2>
+          <div class="overstats">
+            <div class="stat"><span class="lbl">Score</span><span class="val" id="oScore">0</span></div>
+            <div class="stat"><span class="lbl">Plate</span><span class="val" id="oPlate">1</span></div>
+            <div class="stat"><span class="lbl">Lysed</span><span class="val" id="oLysed">0</span></div>
+          </div>
+          <p class="fact" id="oFact"></p>
+          <button class="cta" id="againBtn" type="button">Start a new course</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pad" id="pad" aria-label="Direction pad">
+      <button class="u" data-d="0,-1" type="button" aria-label="Up">▲</button>
+      <button class="l" data-d="-1,0" type="button" aria-label="Left">◀</button>
+      <button class="d" data-d="0,1" type="button" aria-label="Down">▼</button>
+      <button class="r" data-d="1,0" type="button" aria-label="Right">▶</button>
+    </div>
+    <p class="keys">The maze is a counting-chamber grid under brightfield. Gram-positives stain violet, Gram-negatives pink.</p>
+  </main>
+
+  <aside class="notebook">
+    <section>
+      <h2 class="sec">The ESKAPE panel</h2>
+      <ul class="roster" id="roster"></ul>
+    </section>
+
+    <section>
+      <h2 class="sec">Ward rules</h2>
+      <dl class="rules">
+        <div><dt>Combination therapy</dt><dd>The four two-tone doses pair a β-lactam with a partner drug. Every bacterium that isn't fully resistant turns vulnerable.</dd></div>
+        <div><dt>Finish the course</dt><dd>A bacterium that survives a dose gains a level of resistance. At three it ignores combination therapy. Lysed bacteria regrow susceptible from the reservoir.</dd></div>
+        <div><dt>Plasmid transfer</dt><dd>When two Gram-negatives, or two Gram-positives, touch, both take the higher resistance level.</dd></div>
+        <div><dt>Biofilm</dt><dd><i>P. aeruginosa</i> leaves green biofilm that slows your capsule.</dd></div>
+        <div><dt>Bacteriophage</dt><dd>Appears twice per plate below the reservoir. Lyses the nearest bacterium, however resistant.</dd></div>
+      </dl>
+      <p class="score-line">Coccus 10 · Dose 50 · Bacterium 200–1600 · Phage 500</p>
+    </section>
+
+    <section>
+      <h2 class="sec">Lab notebook</h2>
+      <ol class="log" id="log"><li class="empty">Events from the plate appear here once treatment starts.</li></ol>
+    </section>
+  </aside>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------- Maze ---------- */
+const MAP = [
+"#####################",
+"#.........#.........#",
+"#o##.####.#.####.##o#",
+"#...................#",
+"#.##.#.#######.#.##.#",
+"#....#....#....#....#",
+"####.####.#.####.####",
+"####.#.........#.####",
+"####.#.###-###.#.####",
+"    ...#GGGGG#...    ",
+"####.#.#######.#.####",
+"####.#.........#.####",
+"####.#.#######.#.####",
+"#.........#.........#",
+"#.##.####.#.####.##.#",
+"#o.#.............#.o#",
+"##.#.#.#######.#.#.##",
+"#....#....#....#....#",
+"#.#######.#.#######.#",
+"#...................#",
+"#####################"];
+const COLS = 21, ROWS = 21, TUN = 9;
+const EXIT = {x:10,y:7}, START = {x:10,y:15};
+const DIRS = [{x:0,y:-1},{x:-1,y:0},{x:0,y:1},{x:1,y:0}];
+const FACTOR = [1, 0.65, 0.35, 0];
+const MODES = [["scatter",7],["chase",20],["scatter",7],["chase",20],["scatter",5],["chase",1e9]];
+const PHAGE_AT = [60, 140];
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const ORG_ORDER = ["Ef","Sa","Kp","Ab","Pa","En"];
+const ORG = {
+  Ef:{name:"E. faecium", full:"Enterococcus faecium", gram:"+", color:"#57298f", ui:"var(--violet)", base:1, home:{x:8,y:9}, release:13, scatter:{x:10,y:24},
+      mech:"VRE: van genes swap the drug's D-Ala-D-Ala target for D-Ala-D-Lac.", act:"Wanders. Starts partly resistant (intrinsic)."},
+  Sa:{name:"S. aureus", full:"Staphylococcus aureus", gram:"+", color:"#6c38b5", ui:"var(--violet)", base:0, home:{x:10,y:7}, release:0, outside:true, scatter:{x:19,y:-3},
+      mech:"MRSA: mecA makes PBP2a, which β-lactams barely bind.", act:"Hunts you directly."},
+  Kp:{name:"K. pneumoniae", full:"Klebsiella pneumoniae", gram:"-", color:"#d43c67", ui:"var(--safranin)", base:0, home:{x:10,y:9}, release:1.5, scatter:{x:1,y:-3},
+      mech:"Carbapenemases (KPC, NDM) break down last-line β-lactams.", act:"Cuts you off ahead."},
+  Ab:{name:"A. baumannii", full:"Acinetobacter baumannii", gram:"-", color:"#e0739a", ui:"var(--safranin)", base:0, home:{x:11,y:9}, release:9, scatter:{x:0,y:24},
+      mech:"OXA carbapenemases; survives weeks on dry hospital surfaces.", act:"Charges, then retreats to its corner."},
+  Pa:{name:"P. aeruginosa", full:"Pseudomonas aeruginosa", gram:"-", color:"#bd3460", ui:"var(--safranin)", base:0, home:{x:9,y:9}, release:5, scatter:{x:20,y:24},
+      mech:"Efflux pumps and a tight outer membrane; builds biofilm.", act:"Flanks with S. aureus. Leaves biofilm."},
+  En:{name:"E. cloacae", full:"Enterobacter cloacae", gram:"-", color:"#d9587e", ui:"var(--safranin)", base:0, home:{x:12,y:9}, release:17, scatter:{x:10,y:-3},
+      mech:"Chromosomal AmpC β-lactamase, induced by β-lactam exposure.", act:"Trails you. Each dose raises its resistance."}
+};
+const COMBOS = [
+  {n:"Piperacillin + tazobactam", why:"the inhibitor shields the β-lactam from β-lactamases"},
+  {n:"Ceftazidime + avibactam", why:"avibactam blocks KPC and AmpC enzymes"},
+  {n:"Meropenem + vaborbactam", why:"vaborbactam protects meropenem from KPC"},
+  {n:"Ampicillin + gentamicin", why:"cell-wall damage lets the aminoglycoside in"}
+];
+const FACTS = [
+  "ESKAPE stands for Enterococcus faecium, Staphylococcus aureus, Klebsiella pneumoniae, Acinetobacter baumannii, Pseudomonas aeruginosa and Enterobacter species.",
+  "The first vancomycin-resistant S. aureus, reported in 2002, carried a vanA gene picked up from an enterococcus.",
+  "Most β-lactamase inhibitors do little on their own. Their job is to protect the partner β-lactam.",
+  "Bacteria inside a biofilm can tolerate far higher antibiotic levels than the same cells swimming free.",
+  "Acinetobacter baumannii can survive for weeks or months on dry hospital surfaces.",
+  "Enterobacter treated with some β-lactams can switch AmpC production on, or select mutants that never switch it off."
+];
+
+/* ---------- DOM ---------- */
+const $ = s => document.querySelector(s);
+const canvas = $("#board"), ctx = canvas.getContext("2d"), stage = $("#stage");
+const elScore = $("#score"), elBest = $("#best"), elPlate = $("#plate"), elLives = $("#lives");
+const titleOv = $("#titleOv"), overOv = $("#overOv"), pauseBtn = $("#pauseBtn"), soundBtn = $("#soundBtn");
+const logEl = $("#log"), rosterEl = $("#roster");
+const mazeA = document.createElement("canvas"), mazeB = document.createElement("canvas");
+
+/* ---------- State ---------- */
+let grid, dots, dotsLeft = 0;
+let T = 24, W = 504, H = 504, dpr = 1;
+let state = "title", paused = false;
+let score = 0, best = 0, level = 1, lives = 3, lysed = 0;
+let dotsEaten = 0, phageNext = 0, phage = null, biofilms = [], floats = [], parts = [], pairCD = {};
+let freezeT = 0, readyT = 0, dyingT = 0, clearT = 0, lifeTime = 0, modeIdx = 0, modeT = 0, eatCount = 0, comboIdx = 0;
+let mouthP = 0, tt = 0, SPD = {}, player, logEntries = [];
+const escapes = [];
+const ghosts = ORG_ORDER.map(id => Object.assign({id}, ORG[id], {
+  x:0,y:0,dir:{x:-1,y:0},moving:false,tx:0,ty:0,state:"pen",fright:0,r:0,shield:0,xfer:0,xferColor:"#000",
+  dropT:6,wander:{x:10,y:13},wanderT:0,bobP:Math.random()*6,releaseAt:0
+}));
+const G = Object.fromEntries(ghosts.map(g => [g.id, g]));
+try { best = parseInt(localStorage.getItem("eskape-chase-best") || "0", 10) || 0; } catch (e) {}
+
+/* ---------- Grid helpers ---------- */
+function buildGrid(){
+  grid = MAP.map(r => r.split(""));
+  dots = new Uint8Array(COLS*ROWS); dotsLeft = 0;
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const ch = grid[r][c];
+    if (ch === "." || ch === "o") { dots[r*COLS+c] = ch === "." ? 1 : 2; dotsLeft++; grid[r][c] = " "; }
+  }
+  const i = START.y*COLS+START.x; if (dots[i]) { dots[i] = 0; dotsLeft--; }
+}
+function tile(c,r){
+  if (r < 0 || r >= ROWS) return "#";
+  if (c < 0 || c >= COLS) return r === TUN ? " " : "#";
+  return grid[r][c];
+}
+const open = (c,r) => { const t = tile(c,r); return t !== "#" && t !== "-" && t !== "G"; };
+const isWallT = (c,r) => c >= 0 && c < COLS && r >= 0 && r < ROWS && MAP[r][c] === "#";
+
+/* ---------- Movement ---------- */
+function advance(e, dist, choose){
+  let guard = 0;
+  while (dist > 1e-9 && guard++ < 8) {
+    if (e.moving) {
+      const rem = Math.abs(e.tx-e.x) + Math.abs(e.ty-e.y);
+      if (dist < rem) { e.x += e.dir.x*dist; e.y += e.dir.y*dist; return; }
+      e.x = e.tx; e.y = e.ty; dist -= rem; e.moving = false;
+      if (e.x <= -1) e.x = COLS; else if (e.x >= COLS) e.x = -1;
+    }
+    const d = choose(e);
+    if (!d) return;
+    e.dir = {x:d.x,y:d.y}; e.tx = e.x+d.x; e.ty = e.y+d.y; e.moving = true;
+  }
+}
+function reverse(e){
+  if (!e.dir.x && !e.dir.y) return;
+  if (e.moving) { e.tx -= e.dir.x; e.ty -= e.dir.y; }
+  e.dir = {x:-e.dir.x, y:-e.dir.y};
+}
+function moveToward(g, tx, ty, dist){
+  const dx = tx-g.x, dy = ty-g.y, d = Math.hypot(dx,dy);
+  if (d <= dist) { g.x = tx; g.y = ty; return true; }
+  g.x += dx/d*dist; g.y += dy/d*dist; return false;
+}
+function playerChoose(p){
+  if ((p.want.x || p.want.y) && open(p.x+p.want.x, p.y+p.want.y)) return p.want;
+  if (open(p.x+p.dir.x, p.y+p.dir.y)) return p.dir;
+  return null;
+}
+function randomOpenTile(){
+  for (let k = 0; k < 200; k++) {
+    const c = 1+Math.floor(Math.random()*(COLS-2)), r = 1+Math.floor(Math.random()*(ROWS-2));
+    if (tile(c,r) === " " && r !== TUN) return {x:c,y:r};
+  }
+  return {x:10,y:13};
+}
+function ghostTarget(g){
+  if (g.state === "eaten") return EXIT;
+  if (MODES[modeIdx][0] === "scatter") return g.scatter;
+  const p = player, f = p.dir;
+  switch (g.id) {
+    case "Sa": return {x:Math.round(p.x), y:Math.round(p.y)};
+    case "Kp": return {x:p.x+4*f.x, y:p.y+4*f.y};
+    case "Pa": { const a = {x:p.x+2*f.x, y:p.y+2*f.y}, s = G.Sa; return {x:2*a.x-s.x, y:2*a.y-s.y}; }
+    case "Ab": return ((g.x-p.x)**2 + (g.y-p.y)**2) > 36 ? p : g.scatter;
+    case "Ef": return g.wander;
+    case "En": return {x:p.x-3*f.x, y:p.y-3*f.y};
+  }
+  return p;
+}
+function ghostChoose(g){
+  if (g.state === "eaten" && g.x === EXIT.x && g.y === EXIT.y) { g.state = "entering"; return null; }
+  const rev = {x:-g.dir.x, y:-g.dir.y};
+  let opts = DIRS.filter(d => !(d.x === rev.x && d.y === rev.y) && open(g.x+d.x, g.y+d.y));
+  if (!opts.length) opts = open(g.x+rev.x, g.y+rev.y) ? [rev] : [];
+  if (!opts.length) return null;
+  if (g.fright > 0 && g.state === "active") return opts[Math.floor(Math.random()*opts.length)];
+  const t = ghostTarget(g); let bestD = null, bd = Infinity;
+  for (const d of opts) { const dx = g.x+d.x-t.x, dy = g.y+d.y-t.y, dd = dx*dx+dy*dy; if (dd < bd) { bd = dd; bestD = d; } }
+  return bestD;
+}
+const inTunnel = g => Math.abs(g.y-TUN) < 0.01 && (g.x < 3.5 || g.x > 16.5);
+const onBiofilm = p => { const c = Math.round(p.x), r = Math.round(p.y); return biofilms.some(b => b.c === c && b.r === r); };
+
+/* ---------- Game flow ---------- */
+function setSpeeds(){
+  const L = Math.min(level-1, 6);
+  SPD = {player:6.6+L*0.15, ghost:5.9+L*0.25, fright:3.5, tunnel:3.3, eaten:12, pen:3.2};
+}
+const frightBase = () => Math.max(2.5, 7.5-(level-1)*0.9);
+const RELEASE_ORDER = ["Sa","Kp","Pa","Ab","Ef","En"];
+const activeCount = () => level === 1 ? 2 : level === 2 ? 4 : 6;
+const newcomers = () => { const prev = level === 2 ? 2 : level === 3 ? 4 : 6; return RELEASE_ORDER.slice(prev, activeCount()).map(id => ORG[id].name); };
+function resetLife(){
+  player = {x:START.x, y:START.y, dir:{x:-1,y:0}, want:{x:-1,y:0}, moving:false, tx:START.x, ty:START.y};
+  const scale = Math.max(0.35, 1-0.12*(level-1));
+  for (const g of ghosts) {
+    if (g.outside) { g.x = EXIT.x; g.y = EXIT.y; g.state = "active"; }
+    else { g.x = g.home.x; g.y = g.home.y; g.state = "pen"; }
+    g.dir = {x:-1,y:0}; g.moving = false; g.fright = 0; g.shield = 0; g.xfer = 0;
+    g.releaseAt = RELEASE_ORDER.indexOf(g.id) < activeCount() ? g.release*scale : Infinity; g.dropT = 6; g.wanderT = 0;
+  }
+  lifeTime = 0; modeIdx = 0; modeT = 0; freezeT = 0; floats = []; pairCD = {};
+}
+function resetLevel(){
+  setSpeeds();
+  ghosts.forEach(g => g.r = g.base);
+  biofilms = []; phage = null; phageNext = 0; dotsEaten = 0;
+  resetLife();
+}
+function newGame(){
+  score = 0; level = 1; lives = 3; lysed = 0; comboIdx = 0; logEntries = [];
+  buildGrid(); resetLevel();
+  state = "ready"; readyT = 2; paused = false;
+  titleOv.hidden = true; overOv.hidden = true;
+  pauseBtn.disabled = false; pauseBtn.textContent = "Pause";
+  log("Plate 1. Only S. aureus and K. pneumoniae leave the reservoir. Clear every susceptible coccus.");
+}
+function nextLevel(){
+  level++; buildGrid(); resetLevel();
+  state = "ready"; readyT = 2;
+  const fresh = newcomers();
+  log(`Plate ${level}. ${fresh.length ? `New on the plate: ${fresh.join(" and ")}. ` : ""}Bacteria move faster and doses wear off sooner.`);
+}
+function gameOver(){
+  state = "over"; pauseBtn.disabled = true;
+  if (score > best) { best = score; try { localStorage.setItem("eskape-chase-best", String(best)); } catch (e) {} }
+  $("#oScore").textContent = score.toLocaleString("en-GB");
+  $("#oPlate").textContent = String(level);
+  $("#oLysed").textContent = String(lysed);
+  $("#oFact").textContent = FACTS[Math.floor(Math.random()*FACTS.length)];
+  overOv.hidden = false;
+  setTimeout(() => { try { $("#againBtn").focus({preventScroll:true}); } catch (e) {} }, 50);
+}
+function die(){
+  state = "dying"; dyingT = 0; sfxDie();
+  const cx = player.x, cy = player.y;
+  for (let i = 0; i < 16; i++) {
+    const a = Math.random()*Math.PI*2, v = 1+Math.random()*2.5;
+    parts.push({x:cx, y:cy, vx:Math.cos(a)*v, vy:Math.sin(a)*v, life:1, c: i%2 ? "#fbfcfd" : "#0f8b80"});
+  }
+  log("Treatment failure. The infection got through.");
+}
+function giveCombo(){
+  const combo = COMBOS[comboIdx++ % COMBOS.length];
+  eatCount = 0; score += 50; sfxCombo();
+  const base = frightBase(), immune = [];
+  for (const g of ghosts) {
+    if (g.state !== "active") continue;
+    const f = FACTOR[g.r];
+    if (f <= 0) { immune.push(g.name); g.shield = 1.2; continue; }
+    g.fright = base*f; reverse(g);
+  }
+  log(`${combo.n}: ${combo.why}.`);
+  if (immune.length) log(`${immune.join(", ")} ${immune.length > 1 ? "are" : "is"} fully resistant and unaffected.`);
+  const en = G.En;
+  if (en.state === "active" && en.r < 3) { en.r++; log(`E. cloacae: β-lactam exposure induced AmpC (resistance ${en.r}/3).`); }
+}
+function eatGhost(g){
+  const pts = [200,400,800,1600][Math.min(eatCount,3)];
+  eatCount++; score += pts; lysed++;
+  g.state = "eaten"; g.fright = 0;
+  floats.push({x:g.x, y:g.y, txt:String(pts), t:0});
+  freezeT = 0.45; sfxGhost();
+}
+function eatPhage(){
+  score += 500; floats.push({x:phage.c, y:phage.r, txt:"500", t:0}); sfxPhage();
+  let target = null, bd = Infinity;
+  for (const g of ghosts) {
+    if (g.state !== "active") continue;
+    const d = (g.x-player.x)**2 + (g.y-player.y)**2;
+    if (d < bd) { bd = d; target = g; }
+  }
+  if (target) { target.state = "eaten"; target.fright = 0; lysed++; log(`Phage therapy: a specific phage lysed ${target.name}, resistance and all.`); }
+  else log("The phage found no host on the plate.");
+  phage = null;
+}
+function checkPhageSpawn(){
+  if (!phage && phageNext < PHAGE_AT.length && dotsEaten >= PHAGE_AT[phageNext]) {
+    phage = {c:10, r:11, t:10}; phageNext++;
+    log("A bacteriophage appeared below the reservoir.");
+  }
+}
+function dropBiofilm(g){
+  const c = Math.round(g.x), r = Math.round(g.y);
+  if (c < 0 || c >= COLS || tile(c,r) !== " ") return;
+  if (biofilms.some(b => b.c === c && b.r === r)) return;
+  biofilms.push({c, r, t:14});
+  if (biofilms.length > 5) biofilms.shift();
+}
+
+/* ---------- Update ---------- */
+function update(dt){
+  switch (state) {
+    case "ready": readyT -= dt; if (readyT <= 0) state = "play"; break;
+    case "play": {
+      if (freezeT > 0) { freezeT -= dt; break; }
+      const n = Math.max(1, Math.ceil(dt/0.008));
+      for (let i = 0; i < n; i++) { stepPlay(dt/n); if (state !== "play" || freezeT > 0) break; }
+      break;
+    }
+    case "dying":
+      dyingT += dt;
+      if (dyingT > 1.6) { lives--; if (lives <= 0) gameOver(); else { resetLife(); state = "ready"; readyT = 1.8; } }
+      break;
+    case "clear": clearT += dt; if (clearT > 2.2) nextLevel(); break;
+  }
+  for (const f of floats) f.t += dt;
+  floats = floats.filter(f => f.t < 0.9);
+  for (const p of parts) { p.x += p.vx*dt; p.y += p.vy*dt; p.vx *= 0.96; p.vy *= 0.96; p.life -= dt*0.8; }
+  parts = parts.filter(p => p.life > 0);
+}
+function stepPlay(h){
+  lifeTime += h;
+  if (!ghosts.some(g => g.fright > 0)) {
+    modeT += h;
+    if (modeT >= MODES[modeIdx][1] && modeIdx < MODES.length-1) {
+      modeT = 0; modeIdx++;
+      ghosts.forEach(g => { if (g.state === "active") reverse(g); });
+    }
+  }
+
+  // player
+  const p = player;
+  if (p.moving && (p.want.x || p.want.y) && p.want.x === -p.dir.x && p.want.y === -p.dir.y) reverse(p);
+  advance(p, SPD.player*(onBiofilm(p) ? 0.55 : 1)*h, playerChoose);
+  if (p.moving) mouthP += h*16;
+  const c = Math.round(p.x), r = Math.round(p.y);
+  if (c >= 0 && c < COLS && r >= 0 && r < ROWS && Math.abs(p.x-c) < 0.35 && Math.abs(p.y-r) < 0.35) {
+    const i = r*COLS+c, d = dots[i];
+    if (d) {
+      dots[i] = 0; dotsLeft--; dotsEaten++;
+      if (d === 1) { score += 10; sfxDot(); } else giveCombo();
+      checkPhageSpawn();
+    }
+  }
+  if (phage && c === phage.c && r === phage.r) eatPhage();
+
+  // ghosts
+  for (const g of ghosts) {
+    if (g.shield > 0) g.shield -= h;
+    if (g.xfer > 0) g.xfer -= h;
+    switch (g.state) {
+      case "pen": if (lifeTime >= g.releaseAt) g.state = "exiting"; break;
+      case "exiting": {
+        const s = SPD.pen*h;
+        if (Math.abs(g.x-10) > 1e-6) moveToward(g, 10, 9, s);
+        else if (moveToward(g, 10, 7, s)) { g.state = "active"; g.moving = false; g.dir = {x: Math.random() < 0.5 ? -1 : 1, y:0}; }
+        break;
+      }
+      case "entering":
+        if (moveToward(g, 10, 9, SPD.pen*2*h)) { g.r = g.base; g.state = "exiting"; }
+        break;
+      case "eaten": advance(g, SPD.eaten*h, ghostChoose); break;
+      case "active": {
+        let sp = g.fright > 0 ? SPD.fright : SPD.ghost;
+        if (inTunnel(g)) sp = Math.min(sp, SPD.tunnel);
+        advance(g, sp*h, ghostChoose);
+        if (g.fright > 0) { g.fright -= h; if (g.fright <= 0) { g.fright = 0; escapes.push(g); } }
+        if (g.id === "Pa" && g.fright <= 0) { g.dropT -= h; if (g.dropT <= 0) { g.dropT = 6.5; dropBiofilm(g); } }
+        if (g.id === "Ef") { g.wanderT -= h; if (g.wanderT <= 0) { g.wanderT = 4; g.wander = randomOpenTile(); } }
+        break;
+      }
+    }
+  }
+  if (escapes.length) {
+    escapes.forEach(g => g.r = Math.min(3, g.r+1));
+    log(`Survived the course: ${escapes.map(g => g.name).join(", ")}. Resistance selected.`);
+    escapes.length = 0;
+  }
+
+  // plasmid transfer
+  for (const k in pairCD) pairCD[k] -= h;
+  for (let i = 0; i < ghosts.length; i++) for (let j = i+1; j < ghosts.length; j++) {
+    const a = ghosts[i], b = ghosts[j];
+    if (a.state !== "active" || b.state !== "active" || a.fright > 0 || b.fright > 0) continue;
+    if (a.gram !== b.gram || a.r === b.r) continue;
+    if (Math.abs(a.x-b.x) > 0.7 || Math.abs(a.y-b.y) > 0.7) continue;
+    const key = a.id+b.id; if (pairCD[key] > 0) continue;
+    const hi = a.r > b.r ? a : b, lo = hi === a ? b : a;
+    lo.r = hi.r; lo.xfer = 0.8; lo.xferColor = hi.color; pairCD[key] = 8; sfxXfer();
+    if (hi.id === "Ef" && lo.id === "Sa") log(`vanA transfer: E. faecium → S. aureus. That is how VRSA first emerged.`);
+    else log(`Plasmid transfer: ${hi.name} → ${lo.name} (resistance ${hi.r}/3).`);
+  }
+
+  for (const b of biofilms) b.t -= h;
+  biofilms = biofilms.filter(b => b.t > 0);
+  if (phage) { phage.t -= h; if (phage.t <= 0) phage = null; }
+
+  // collisions
+  for (const g of ghosts) {
+    if (g.state !== "active") continue;
+    if (Math.abs(g.x-p.x) < 0.62 && Math.abs(g.y-p.y) < 0.62) {
+      if (g.fright > 0) eatGhost(g); else { die(); return; }
+    }
+  }
+  if (dotsLeft === 0) { state = "clear"; clearT = 0; sfxClear(); log(`Plate ${level} sterilised.`); }
+}
+
+/* ---------- Drawing ---------- */
+function rrPath(c,x,y,w,h,r){
+  r = Math.max(0, Math.min(r, w/2, h/2));
+  c.beginPath(); c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r);
+  c.closePath();
+}
+function hexA(hex,a){ const n = parseInt(hex.slice(1),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+
+const PAL = {f0:"#f7f9fb", f1:"#d6dce7", grid:"rgba(70,92,135,0.07)", gridS:"rgba(70,92,135,0.15)", w0:"#6c7994", w1:"#96a2ba", w2:"#c0c8d8", pen:"rgba(224,90,130,0.10)", door:"#e05a82"};
+const PAL_FLASH = Object.assign({}, PAL, {w0:"#56378f", w1:"#8a6bc8", w2:"#cdbdf0"});
+
+function wallPass(m, pad, color){
+  m.fillStyle = color;
+  const rad = Math.max(0, (T/2-pad)*0.95), e = 0.5;
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (!isWallT(c,r)) continue;
+    const x = c*T, y = r*T;
+    rrPath(m, x+pad, y+pad, T-2*pad, T-2*pad, rad); m.fill();
+    if (isWallT(c+1,r)) m.fillRect(x+T/2, y+pad, T+e, T-2*pad);
+    if (isWallT(c,r+1)) m.fillRect(x+pad, y+T/2, T-2*pad, T+e);
+    if (isWallT(c+1,r) && isWallT(c,r+1) && isWallT(c+1,r+1)) m.fillRect(x+T/2, y+T/2, T+e, T+e);
+  }
+}
+function buildMaze(cv, pal){
+  cv.width = canvas.width; cv.height = canvas.height;
+  const m = cv.getContext("2d"); m.setTransform(dpr,0,0,dpr,0,0);
+  const g = m.createRadialGradient(W/2,H/2,W*0.08,W/2,H/2,W*0.78);
+  g.addColorStop(0,pal.f0); g.addColorStop(1,pal.f1);
+  m.fillStyle = g; m.fillRect(0,0,W,H);
+  // counting-chamber grid: fine rules every square, heavier every fourth
+  for (let i = 0; i <= COLS; i++) {
+    m.strokeStyle = i%4 === 0 ? pal.gridS : pal.grid; m.lineWidth = i%4 === 0 ? 1.2 : 0.8;
+    m.beginPath(); m.moveTo(i*T,0); m.lineTo(i*T,H); m.stroke();
+    m.beginPath(); m.moveTo(0,i*T); m.lineTo(W,i*T); m.stroke();
+  }
+  wallPass(m, T*0.12, pal.w0); wallPass(m, T*0.2, pal.w1); wallPass(m, T*0.33, pal.w2);
+  m.fillStyle = pal.pen; rrPath(m, 8*T+T*0.08, 9*T+T*0.1, 5*T-T*0.16, T*0.8, T*0.3); m.fill();
+  m.fillStyle = pal.door; rrPath(m, 10*T-T*0.13, 8.5*T-T*0.06, T*1.26, T*0.12, T*0.06); m.fill();
+}
+function resize(){
+  const w = stage.clientWidth || 504;
+  T = w/COLS; W = COLS*T; H = ROWS*T;
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(W*dpr); canvas.height = Math.round(H*dpr);
+  canvas.style.height = H+"px";
+  buildMaze(mazeA, PAL); buildMaze(mazeB, PAL_FLASH);
+}
+
+function drawBody(c, id, s, fill, stroke, plain, t){
+  c.fillStyle = fill; c.strokeStyle = stroke; c.lineWidth = Math.max(1, s*0.045);
+  const circ = (x,y,r) => { c.beginPath(); c.arc(x*s,y*s,r*s,0,Math.PI*2); c.fill(); c.stroke(); };
+  const ell = (x,y,rx,ry,rot=0) => { c.beginPath(); c.ellipse(x*s,y*s,rx*s,ry*s,rot,0,Math.PI*2); c.fill(); c.stroke(); };
+  const rod = (x,y,w,h) => { rrPath(c,(x-w/2)*s,(y-h/2)*s,w*s,h*s,h*s/2); c.fill(); c.stroke(); };
+  switch (id) {
+    case "Sa": circ(-.19,.09,.16); circ(.19,.09,.16); circ(-.1,-.16,.16); circ(.11,-.16,.15); circ(0,.25,.14); circ(0,.02,.19); break;
+    case "Ef": ell(-.17,0,.17,.25,-.18); ell(.17,0,.17,.25,.18); break;
+    case "Ab": ell(-.16,0,.19,.16); ell(.17,0,.19,.16); break;
+    case "Kp":
+      if (!plain) {
+        c.save(); c.setLineDash([s*.06,s*.05]); c.fillStyle = hexA(fill,.17); c.strokeStyle = hexA(fill,.6);
+        rrPath(c,-.43*s,-.29*s,.86*s,.58*s,.29*s); c.fill(); c.stroke(); c.restore();
+        c.fillStyle = fill; c.strokeStyle = stroke;
+      }
+      rod(0,0,.64,.32); break;
+    case "Pa":
+      if (!plain) {
+        const g = c.createRadialGradient(0,0,s*.08,0,0,s*.52);
+        g.addColorStop(0,"rgba(47,184,150,.5)"); g.addColorStop(1,"rgba(47,184,150,0)");
+        c.fillStyle = g; c.beginPath(); c.arc(0,0,s*.52,0,Math.PI*2); c.fill();
+      }
+      c.save(); c.setLineDash([]); c.lineWidth = Math.max(1,s*.04); c.strokeStyle = plain ? stroke : "rgba(28,18,48,.7)";
+      c.beginPath();
+      for (let i = 0; i <= 10; i++) { const x = -.3-i*.033, y = Math.sin(i*1.15+t*14)*.06; i ? c.lineTo(x*s,y*s) : c.moveTo(x*s,y*s); }
+      c.stroke(); c.restore();
+      c.fillStyle = fill; c.strokeStyle = stroke; rod(0,0,.6,.25); break;
+    case "En": {
+      c.save(); c.setLineDash([]); c.lineWidth = Math.max(1,s*.03); c.strokeStyle = plain ? stroke : "rgba(28,18,48,.55)";
+      for (const [x,y,sg] of [[-.22,-.15,-1],[0,-.15,-1],[.22,-.15,-1],[-.22,.15,1],[0,.15,1],[.22,.15,1]]) {
+        c.beginPath();
+        for (let i = 0; i <= 6; i++) { const yy = y+sg*i*.035, xx = x+Math.sin(i*1.3+t*12+x*9)*.035; i ? c.lineTo(xx*s,yy*s) : c.moveTo(xx*s,yy*s); }
+        c.stroke();
+      }
+      c.restore(); c.fillStyle = fill; c.strokeStyle = stroke; rod(0,0,.6,.3); break;
+    }
+  }
+}
+function drawEyes(c, cx, cy, s, dir, scared, faint){
+  const ox = s*0.1, ey = cy-s*0.04, er = s*0.085;
+  for (const k of [-1,1]) {
+    c.beginPath(); c.arc(cx+k*ox, ey, er, 0, Math.PI*2);
+    c.fillStyle = faint ? "rgba(255,255,255,.85)" : "#fff"; c.fill();
+    c.lineWidth = Math.max(1, s*0.025); c.strokeStyle = "rgba(28,18,48,.6)"; c.stroke();
+    const px = scared ? 0 : dir.x*s*0.035, py = scared ? 0 : dir.y*s*0.035;
+    c.beginPath(); c.arc(cx+k*ox+px, ey+py, scared ? s*0.026 : s*0.045, 0, Math.PI*2);
+    c.fillStyle = "#1b1530"; c.fill();
+  }
+  if (scared) {
+    c.beginPath();
+    for (let i = 0; i <= 4; i++) { const x = cx-s*0.14+i*s*0.07, y = cy+s*0.12+(i%2 ? -1 : 1)*s*0.028; i ? c.lineTo(x,y) : c.moveTo(x,y); }
+    c.lineWidth = Math.max(1, s*0.03); c.strokeStyle = "#6b5a8c"; c.stroke();
+  }
+}
+function drawGhost(g){
+  const bob = g.state === "pen" && !reduceMotion ? Math.sin(tt*4+g.bobP)*T*0.12 : 0;
+  const cx = g.x*T+T/2, cy = g.y*T+T/2+bob;
+  const dead = g.state === "eaten" || g.state === "entering";
+  const fr = g.fright > 0 && g.state === "active";
+  let fill = g.color, stroke = "rgba(28,18,48,.55)", dash = null;
+  if (fr) {
+    const flashing = g.fright < 2 && Math.floor(g.fright*6)%2 === 0;
+    fill = flashing ? "#ffffff" : "#efe9fb"; stroke = flashing ? "#8d98ae" : g.color; dash = [T*.07, T*.05];
+  }
+  if (dead) { fill = "rgba(0,0,0,0)"; stroke = hexA(g.color,.5); dash = [T*.05, T*.06]; }
+  const isRod = g.id === "Kp" || g.id === "Pa" || g.id === "En";
+  ctx.save(); ctx.translate(cx, cy);
+  if (fr && !reduceMotion) ctx.translate(Math.sin(tt*30+g.bobP)*T*0.02, 0);
+  if (isRod) ctx.rotate(Math.atan2(g.dir.y, g.dir.x));
+  if (dash) ctx.setLineDash(dash);
+  drawBody(ctx, g.id, T, fill, stroke, fr || dead, tt);
+  ctx.restore();
+  drawEyes(ctx, cx, cy, T, g.dir, fr, dead);
+  if (!dead) {
+    const py = cy-T*0.5;
+    for (let k = 0; k < 3; k++) {
+      ctx.beginPath(); ctx.arc(cx+(k-1)*T*0.13, py, T*0.05, 0, Math.PI*2);
+      ctx.fillStyle = k < g.r ? g.color : "rgba(40,50,80,.18)"; ctx.fill();
+    }
+    if (g.r >= 3 && !fr) {
+      ctx.beginPath(); ctx.arc(cx, cy, T*0.47, 0, Math.PI*2);
+      ctx.lineWidth = Math.max(1, T*0.04); ctx.strokeStyle = hexA(g.color,.45); ctx.stroke();
+    }
+  }
+  if (g.shield > 0) {
+    const k = g.shield/1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, T*(0.55+(1-k)*0.25), 0, Math.PI*2);
+    ctx.lineWidth = Math.max(1.5, T*0.08*k); ctx.strokeStyle = `rgba(38,50,74,${k})`; ctx.stroke();
+  }
+  if (g.xfer > 0) {
+    const k = g.xfer/0.8;
+    ctx.beginPath(); ctx.arc(cx, cy, T*(0.4+(1-k)*0.5), 0, Math.PI*2);
+    ctx.lineWidth = Math.max(1.5, T*0.07*k); ctx.strokeStyle = hexA(g.xferColor, k); ctx.stroke();
+  }
+}
+function drawCapsule(c, cx, cy, s, ang, open, alpha){
+  const L = s*0.92, Wd = s*0.52, r = Wd/2, hx = -L/2+r;
+  c.save(); c.translate(cx, cy); c.rotate(ang); c.globalAlpha = alpha;
+  for (const sg of [-1, 1]) {
+    c.save(); c.translate(hx,0); c.rotate(sg*open); c.translate(-hx,0);
+    const p = new Path2D();
+    p.moveTo(-L/2, 0);
+    if (sg < 0) { p.arc(-L/2+r,0,r,Math.PI,1.5*Math.PI); p.lineTo(L/2-r,-r); p.arc(L/2-r,0,r,1.5*Math.PI,2*Math.PI); }
+    else { p.arc(-L/2+r,0,r,Math.PI,0.5*Math.PI,true); p.lineTo(L/2-r,r); p.arc(L/2-r,0,r,0.5*Math.PI,0,true); }
+    p.closePath();
+    c.fillStyle = "#fbfcfd"; c.fill(p);
+    c.save(); c.clip(p);
+    c.fillStyle = "#0f8b80"; c.fillRect(-L*0.04, -r-2, L, 2*r+4);
+    if (sg < 0) {
+      c.strokeStyle = "rgba(255,255,255,.65)"; c.lineWidth = Math.max(1, s*0.05); c.lineCap = "round";
+      c.beginPath(); c.moveTo(-L*0.24, -r*0.58); c.lineTo(L*0.26, -r*0.58); c.stroke();
+    }
+    c.strokeStyle = "rgba(38,50,74,.55)"; c.lineWidth = Math.max(1, s*0.03);
+    c.beginPath(); c.moveTo(-L*0.04, 0); c.lineTo(-L*0.04, sg*r); c.stroke();
+    c.restore();
+    c.strokeStyle = "#26324a"; c.lineWidth = Math.max(1, s*0.05); c.stroke(p);
+    c.restore();
+  }
+  c.restore();
+}
+function drawPlayer(){
+  if (state === "over") return;
+  const p = player, cx = p.x*T+T/2, cy = p.y*T+T/2;
+  let open = 0.06+0.38*Math.abs(Math.sin(mouthP)), alpha = 1;
+  if (state === "title" || state === "ready") open = 0.18;
+  if (state === "dying") { const k = Math.min(1, dyingT/1.1); open = 0.2+k*1.2; alpha = 1-k; }
+  if (alpha > 0) drawCapsule(ctx, cx, cy, T, Math.atan2(p.dir.y, p.dir.x), open, alpha);
+}
+function drawDots(){
+  ctx.beginPath();
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (dots[r*COLS+c] !== 1) continue;
+    const x = c*T+T/2, y = r*T+T/2;
+    ctx.moveTo(x+T*0.095, y); ctx.arc(x, y, T*0.095, 0, Math.PI*2);
+  }
+  ctx.fillStyle = "#8468b8"; ctx.fill();
+  const pulse = reduceMotion ? 1 : 1+0.12*Math.sin(tt*6);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (dots[r*COLS+c] !== 2) continue;
+    const x = c*T+T/2, y = r*T+T/2, rr = T*0.2*pulse, o = T*0.09*pulse;
+    ctx.save(); ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = "#7c4cc9"; ctx.beginPath(); ctx.arc(x-o, y, rr, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#2bb3a5"; ctx.beginPath(); ctx.arc(x+o, y, rr, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+}
+function drawBiofilms(){
+  for (const b of biofilms) {
+    const a = Math.min(1, b.t/2), cx = b.c*T+T/2, cy = b.r*T+T/2, seed = b.c*31+b.r*17;
+    ctx.fillStyle = `rgba(46,160,130,${0.24*a})`;
+    for (let i = 0; i < 5; i++) {
+      const an = seed+i*1.7;
+      ctx.beginPath(); ctx.arc(cx+Math.cos(an)*T*0.15, cy+Math.sin(an)*T*0.15, T*(0.2+((seed*7+i*13)%10)/90), 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = `rgba(22,95,80,${0.5*a})`;
+    for (let i = 0; i < 4; i++) {
+      const an = seed*1.3+i*1.9;
+      ctx.save(); ctx.translate(cx+Math.cos(an)*T*0.18, cy+Math.sin(an)*T*0.15); ctx.rotate(an);
+      rrPath(ctx, -T*0.06, -T*0.025, T*0.12, T*0.05, T*0.025); ctx.fill(); ctx.restore();
+    }
+  }
+}
+function drawPhage(){
+  if (!phage || (phage.t < 3 && Math.floor(phage.t*6)%2 === 0)) return;
+  const cx = phage.c*T+T/2, cy = phage.r*T+T/2+(reduceMotion ? 0 : Math.sin(tt*3)*T*0.04);
+  ctx.save(); ctx.translate(cx, cy); ctx.lineWidth = Math.max(1, T*0.045); ctx.strokeStyle = "#26324a"; ctx.fillStyle = "#ffffff";
+  const hr = T*0.17, hy = -T*0.17;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) { const a = Math.PI/6+i*Math.PI/3, x = Math.cos(a)*hr, y = hy+Math.sin(a)*hr; i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#35bfb0"; ctx.beginPath(); ctx.arc(0, hy, hr*0.42, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#ffffff"; rrPath(ctx, -T*0.04, hy+hr*0.85, T*0.08, T*0.24, T*0.02); ctx.fill(); ctx.stroke();
+  const by = hy+hr*0.85+T*0.24;
+  ctx.beginPath();
+  for (const k of [-1,1]) { ctx.moveTo(0,by); ctx.lineTo(k*T*0.13,by+T*0.06); ctx.lineTo(k*T*0.18,by+T*0.16); ctx.moveTo(0,by); ctx.lineTo(k*T*0.06,by+T*0.15); }
+  ctx.stroke(); ctx.restore();
+}
+function banner(text, color){
+  ctx.save();
+  ctx.font = `${Math.round(T*0.74)}px Bungee, "Arial Black", sans-serif`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.lineWidth = Math.max(3, T*0.18); ctx.strokeStyle = "rgba(247,249,251,.95)"; ctx.lineJoin = "round";
+  ctx.strokeText(text, W/2, 11*T+T/2); ctx.fillStyle = color; ctx.fillText(text, W/2, 11*T+T/2);
+  ctx.restore();
+}
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const flash = state === "clear" && Math.floor(clearT*5)%2 === 1;
+  ctx.drawImage(flash ? mazeB : mazeA, 0, 0, W, H);
+  drawBiofilms(); drawDots(); drawPhage();
+  for (const g of ghosts) drawGhost(g);
+  drawPlayer();
+  for (const p of parts) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x*T+T/2, p.y*T+T/2, T*0.07, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  for (const f of floats) {
+    ctx.save(); ctx.globalAlpha = 1-f.t/0.9;
+    ctx.font = `600 ${Math.round(T*0.5)}px "IBM Plex Mono", monospace`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const x = f.x*T+T/2, y = f.y*T+T/2-f.t*T*0.8;
+    ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.strokeText(f.txt, x, y); ctx.fillStyle = "#26324a"; ctx.fillText(f.txt, x, y);
+    ctx.restore();
+  }
+  if (paused && (state === "play" || state === "ready")) banner("PAUSED", "#26324a");
+  else if (state === "ready") banner(level > 1 ? `PLATE ${level}` : "DOSING", "#0f8b80");
+  else if (state === "clear") banner("STERILE", "#56378f");
+}
+
+/* ---------- HUD, roster, log ---------- */
+const CAPSULE_SVG = '<svg viewBox="0 0 26 13" aria-hidden="true"><rect x="1" y="1" width="24" height="11" rx="5.5" fill="#fbfcfd"/><path d="M12 1h7.5a5.5 5.5 0 0 1 0 11H12z" fill="#0f8b80"/><rect x="1" y="1" width="24" height="11" rx="5.5" fill="none" stroke="#0c1019" stroke-width="1"/></svg>';
+const hud = {};
+function setText(el, k, v){ if (hud[k] !== v) { hud[k] = v; el.textContent = v; } }
+function statusOf(g){
+  if (g.state === "pen") return ["In reservoir","idle"];
+  if (g.state === "exiting") return ["Emerging","idle"];
+  if (g.state === "eaten" || g.state === "entering") return ["Lysed","dead"];
+  if (g.fright > 0) return ["Vulnerable","weak"];
+  return g.r >= 3 ? ["Immune","hot"] : ["Spreading","live"];
+}
+const rosterRows = {};
+function buildRoster(){
+  for (const id of ORG_ORDER) {
+    const o = ORG[id];
+    const li = document.createElement("li"); li.className = "org";
+    li.innerHTML = `<canvas class="ico" width="92" height="92" aria-hidden="true"></canvas>
+      <div><div><span class="bin">${o.full}</span><span class="gram ${o.gram === "+" ? "pos" : "neg"}">Gram${o.gram === "+" ? "+" : "−"}</span></div>
+      <p class="mech">${o.mech}</p><p class="act">${o.act}</p></div>
+      <div class="state" style="--c:${o.ui}"><span class="pips" aria-label="Resistance level"><i></i><i></i><i></i></span><span class="status"></span></div>`;
+    rosterEl.appendChild(li);
+    const cv = li.querySelector("canvas"), c = cv.getContext("2d");
+    c.setTransform(2,0,0,2,0,0);
+    c.save(); c.translate(23,25); drawBody(c, id, 34, o.color, "rgba(28,18,48,.55)", false, 0.3); c.restore();
+    drawEyes(c, 23, 25, 34, {x:1,y:0}, false, false);
+    rosterRows[id] = {pips: li.querySelectorAll(".pips i"), status: li.querySelector(".status"), key:""};
+  }
+}
+function rosterSync(){
+  for (const g of ghosts) {
+    const [label, cls] = statusOf(g), row = rosterRows[g.id], key = g.r+label;
+    if (row.key === key) continue;
+    row.key = key;
+    row.pips.forEach((p,i) => p.classList.toggle("on", i < g.r));
+    row.status.textContent = label; row.status.className = "status "+cls;
+  }
+}
+function hudSync(){
+  setText(elScore, "s", score.toLocaleString("en-GB"));
+  setText(elBest, "b", Math.max(best, score).toLocaleString("en-GB"));
+  setText(elPlate, "p", String(level));
+  if (hud.l !== lives) { hud.l = lives; elLives.innerHTML = CAPSULE_SVG.repeat(Math.max(0, lives)); elLives.setAttribute("aria-label", `${lives} courses left`); }
+  rosterSync();
+}
+function log(msg){
+  logEntries.unshift({msg, stamp:`P${level}`});
+  logEntries = logEntries.slice(0, 7);
+  logEl.innerHTML = "";
+  for (const e of logEntries) {
+    const li = document.createElement("li");
+    const s = document.createElement("span"); s.className = "stamp"; s.textContent = e.stamp;
+    const m = document.createElement("span"); m.textContent = e.msg;
+    li.append(s, m); logEl.appendChild(li);
+  }
+}
+
+/* ---------- Sound ---------- */
+let actx = null, muted = false;
+try { muted = localStorage.getItem("eskape-chase-muted") === "1"; } catch (e) {}
+function audio(){
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+  if (actx && actx.state === "suspended") actx.resume().catch(() => {});
+}
+function tone(f0, f1, dur, type="square", vol=0.04, delay=0){
+  if (muted || !actx) return;
+  try {
+    const t0 = actx.currentTime+delay, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t0);
+    if (f1) o.frequency.exponentialRampToValueAtTime(f1, t0+dur);
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0+dur+0.02);
+  } catch (e) {}
+}
+let dotAlt = false, lastDot = 0;
+function sfxDot(){ if (tt-lastDot < 0.07) return; lastDot = tt; dotAlt = !dotAlt; tone(dotAlt ? 520 : 400, null, 0.06, "square", 0.022); }
+const sfxCombo = () => tone(260, 880, 0.35, "triangle", 0.06);
+const sfxGhost = () => tone(500, 1500, 0.2, "square", 0.035);
+const sfxDie = () => tone(660, 70, 1.0, "sawtooth", 0.045);
+const sfxPhage = () => { tone(900, null, 0.08, "sine", 0.06); tone(1250, null, 0.1, "sine", 0.06, 0.09); };
+const sfxXfer = () => tone(300, 520, 0.15, "sine", 0.035);
+const sfxClear = () => [523,659,784,1047].forEach((f,i) => tone(f, null, 0.14, "triangle", 0.05, i*0.12));
+function syncSoundBtn(){ soundBtn.textContent = muted ? "Sound off" : "Sound on"; soundBtn.setAttribute("aria-pressed", String(!muted)); }
+function toggleMute(){ muted = !muted; try { localStorage.setItem("eskape-chase-muted", muted ? "1" : "0"); } catch (e) {} if (!muted) audio(); syncSoundBtn(); }
+
+/* ---------- Input ---------- */
+function setWant(d){ if (player) player.want = {x:d[0], y:d[1]}; }
+function togglePause(){
+  if (state !== "play" && state !== "ready") return;
+  paused = !paused; pauseBtn.textContent = paused ? "Resume" : "Pause";
+}
+function start(){ audio(); newGame(); }
+const KEYS = {ArrowUp:[0,-1],KeyW:[0,-1],ArrowDown:[0,1],KeyS:[0,1],ArrowLeft:[-1,0],KeyA:[-1,0],ArrowRight:[1,0],KeyD:[1,0]};
+window.addEventListener("keydown", e => {
+  const active = state === "play" || state === "ready";
+  const k = KEYS[e.code];
+  if (k) { if (active) e.preventDefault(); setWant(k); return; }
+  if (e.code === "KeyP" || e.code === "Escape") { if (active) { e.preventDefault(); togglePause(); } return; }
+  if (e.code === "KeyM") { toggleMute(); return; }
+  if (e.target && e.target.tagName === "BUTTON") return;
+  if ((e.code === "Enter" || e.code === "Space") && (state === "title" || state === "over")) { e.preventDefault(); start(); return; }
+  if (e.code === "Space" && active) { e.preventDefault(); togglePause(); }
+});
+let sw = null;
+canvas.addEventListener("pointerdown", e => { sw = {x:e.clientX, y:e.clientY}; });
+canvas.addEventListener("pointermove", e => {
+  if (!sw) return;
+  const dx = e.clientX-sw.x, dy = e.clientY-sw.y;
+  if (Math.hypot(dx,dy) > 16) { setWant(Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx),0] : [0,Math.sign(dy)]); sw = {x:e.clientX, y:e.clientY}; }
+});
+["pointerup","pointercancel","pointerleave"].forEach(ev => canvas.addEventListener(ev, () => { sw = null; }));
+document.querySelectorAll("#pad button").forEach(b => {
+  b.addEventListener("pointerdown", e => { e.preventDefault(); setWant(b.dataset.d.split(",").map(Number)); });
+});
+$("#startBtn").addEventListener("click", start);
+$("#againBtn").addEventListener("click", start);
+pauseBtn.addEventListener("click", togglePause);
+soundBtn.addEventListener("click", toggleMute);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && (state === "play" || state === "ready") && !paused) togglePause();
+});
+
+/* ---------- Boot ---------- */
+buildGrid(); resetLevel(); buildRoster(); syncSoundBtn();
+resize();
+if (window.ResizeObserver) new ResizeObserver(() => resize()).observe(stage);
+else window.addEventListener("resize", resize);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => {});
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, Math.max(0, (now-last)/1000)); last = now;
+  if (!paused) { tt += dt; update(dt); }
+  draw(); hudSync();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
