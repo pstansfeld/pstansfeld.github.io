@@ -1,0 +1,1800 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Superbug Smackdown</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Lilita+One&display=swap">
+<style>
+/* Layout: a 3x3 culture-well plate is the hero, with the drug tray under the thumb as the mallet. Side column (pathogen + field guide) on wide screens, stacked below on phones. Single deliberate dark theme shared with Superbug Showdown. */
+:root{
+  --stain:#2a1150;          /* crystal violet */
+  --stain-2:#4a1c7c;
+  --glass:rgba(255,255,255,.07);
+  --glass-2:rgba(255,255,255,.13);
+  --line:rgba(255,255,255,.16);
+  --safranin:#ff5c8a;       /* counterstain accent */
+  --safranin-deep:#c92a62;
+  --gold:#ffcf4a;
+  --ink:#fbf3ff;
+  --muted:#cbb6ee;
+  --good:#7ef0b0;
+  --warn:#ffb36b;
+  --bad:#ff7a9c;
+  --viral:#7fe7f2;
+  --card:#fdf7ff;
+  --card-2:#f1e6ff;
+  --card-ink:#2a1150;
+  --card-muted:#6b5591;
+  --font-display:"Lilita One","Arial Rounded MT Bold","Trebuchet MS",sans-serif;
+  --font-ui:"Baloo 2","Trebuchet MS",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background-color:var(--stain);background-image:radial-gradient(1100px 700px at 75% 0%,var(--stain-2),transparent 70%),radial-gradient(800px 600px at 0% 100%,rgba(255,92,138,.16),transparent 70%);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.4}
+button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.app{height:100%;max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px;display:grid;gap:12px 22px;
+  grid-template-columns:290px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto auto;
+  grid-template-areas:"top top" "side hud" "side board" "side tray" "side ticker"}
+.top{grid-area:top;display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap}
+.brandwrap{display:flex;flex-direction:column;gap:3px;min-width:0}
+.brand{font-family:var(--font-display);font-weight:400;font-size:30px;line-height:1;margin:0;color:var(--gold);text-shadow:0 3px 0 #170630;letter-spacing:.01em}
+.brand span{color:var(--safranin)}
+.tagline{margin:0;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.chip{font-weight:800;font-size:13px;padding:4px 12px;border-radius:999px;background:var(--glass-2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.spacer{flex:1}
+.tally{display:inline-flex;align-items:baseline;gap:6px;font-weight:800;font-size:13px;color:var(--muted);padding:3px 12px;border-radius:999px;border:1px solid rgba(255,207,74,.35);background:rgba(255,207,74,.08);white-space:nowrap}
+.tally b{font-family:var(--font-display);font-weight:400;font-size:18px;color:var(--gold);font-variant-numeric:tabular-nums;display:inline-block}
+.tally b.bump{animation:bump .45s ease}
+@keyframes bump{40%{transform:scale(1.4)}}
+.btn{background:var(--glass-2);border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-weight:700;cursor:pointer}
+.btn:hover{background:rgba(255,255,255,.2)}
+.btn:focus-visible,.cta:focus-visible,.ghost:focus-visible,.plate:focus-visible,.drug:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+.side{grid-area:side;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
+.panel{background:var(--glass);border:1px solid var(--line);border-radius:18px;padding:12px 14px}
+.pathogen{display:grid;grid-template-columns:60px minmax(0,1fr);gap:8px 12px;align-items:center}
+.pathogen>img{width:60px;height:60px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.18),rgba(255,255,255,.04))}
+.pathogen h2{font-family:var(--font-display);font-weight:400;font-size:22px;margin:0;line-height:1.05}
+.latin{margin:2px 0 0;font-size:13px;color:var(--muted);line-height:1.25}
+.ph-rows{grid-column:1/-1;display:grid;gap:6px}
+.ph-row{display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;align-items:start;font-size:13px}
+.ph-row .k{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;padding-top:2px}
+.ph-row .v{display:flex;flex-wrap:wrap;gap:4px 8px;font-weight:700}
+.res{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.res img{width:16px;height:16px}
+.trait{background:var(--glass-2);border-radius:999px;padding:0 8px;font-size:12px}
+.guide h3{margin:0 0 10px;font-family:var(--font-display);font-weight:400;font-size:19px}
+.guide ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.guide li{display:grid;grid-template-columns:42px minmax(0,1fr);gap:10px;align-items:center}
+.guide img{width:42px;height:42px}
+.guide b{display:flex;align-items:center;gap:6px;flex-wrap:wrap;line-height:1.15}
+.guide small{display:block;font-size:12.5px;color:var(--muted);line-height:1.3;margin-top:1px}
+.verdict{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:1px 8px;border-radius:999px}
+.verdict.whack{background:rgba(255,207,74,.16);color:var(--gold)}
+.verdict.leave{background:rgba(255,122,156,.18);color:var(--bad)}
+.verdict.bonus{background:rgba(126,240,176,.15);color:var(--good)}
+.verdict.antiviral{background:rgba(63,208,224,.16);color:var(--viral)}
+
+.hud{grid-area:hud;width:100%;max-width:var(--bs,100%);justify-self:center;display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr) minmax(0,2fr);gap:8px}
+.stat{background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:7px 6px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0}
+.label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.stat .num{font-family:var(--font-display);font-size:28px;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat.time .num{color:var(--gold)}
+.stat.time.low{border-color:rgba(255,122,156,.7);animation:low 1.1s ease-in-out infinite}
+.stat.time.low .num{color:var(--bad)}
+@keyframes low{50%{background:rgba(255,92,138,.18)}}
+.num small{font-family:var(--font-ui);font-size:14px;font-weight:800;color:var(--gold);margin-left:4px}
+.infect{background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:7px 12px 18px;display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0}
+.infect .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ival{font-family:var(--font-display);font-size:20px;line-height:1;font-variant-numeric:tabular-nums}
+.ibar{position:relative;height:12px;border-radius:6px;background:rgba(0,0,0,.28);box-shadow:inset 0 0 0 1px var(--line)}
+.ifill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:6px;background:var(--good);transition:width .25s ease,background-color .3s}
+.ifill.warm{background:var(--warn)}
+.ifill.hot{background:var(--bad)}
+.mark{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:rgba(255,255,255,.65);border-radius:1px}
+.mark i{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:1px;font-style:normal;font-size:10px;font-weight:800;color:var(--muted);white-space:nowrap;line-height:1.2}
+.infect.bump{animation:ibump .5s ease}
+@keyframes ibump{30%{background:rgba(255,92,138,.32);border-color:rgba(255,122,156,.8)}}
+
+.board-wrap{grid-area:board;position:relative;min-height:280px;min-width:0}
+#board{position:absolute;inset:0;margin:auto;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;border-radius:22px;outline:none;cursor:pointer}
+.noscript{position:absolute;inset:0;margin:0;display:grid;place-items:center;text-align:center;padding:24px;border-radius:22px;border:2px dashed var(--line);font-weight:700;font-size:17px}
+
+.tray{grid-area:tray;width:100%;max-width:var(--bs,100%);justify-self:center;display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:8px}
+.drug{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 9px;border-radius:16px;background:var(--glass);border:1px solid var(--line);cursor:pointer;min-width:0;transition:transform .12s ease,background-color .12s}
+.drug img{width:42px;height:42px;pointer-events:none}
+.drug .dn{font-weight:800;font-size:12.5px;line-height:1.1;text-align:center;overflow-wrap:anywhere;hyphens:manual;pointer-events:none}
+.drug .key{position:absolute;top:4px;left:8px;font-size:11px;font-weight:800;color:var(--muted);pointer-events:none}
+.drug:hover{background:rgba(255,255,255,.11)}
+.drug[aria-checked="true"]{background:rgba(255,207,74,.15);border-color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold),0 5px 0 rgba(12,0,30,.4);transform:translateY(-3px)}
+.drug[aria-checked="true"] .dn{color:var(--gold)}
+.pbar{display:none;width:78%;height:5px;border-radius:3px;background:rgba(255,255,255,.12);margin-top:4px;overflow:hidden;pointer-events:none}
+.tray.pressure-on .pbar{display:block}
+.pfill{display:block;height:100%;width:0;border-radius:3px;background:var(--good);transition:width .3s ease,background-color .3s}
+.pfill.warm{background:var(--warn)}
+.pfill.hot{background:var(--bad);animation:hot 1s ease-in-out infinite}
+@keyframes hot{50%{opacity:.45}}
+
+.ticker{grid-area:ticker;width:100%;max-width:var(--bs,100%);justify-self:center;margin:0;padding:8px 14px;border-radius:14px;background:rgba(0,0,0,.2);border:1px solid var(--line);min-height:3.4em;display:flex;flex-direction:column;justify-content:center}
+.ticker .now{font-weight:700}
+.ticker .prev{color:var(--muted);font-size:13px}
+
+.modal{position:fixed;inset:0;z-index:20;display:grid;padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:rgba(18,4,38,.6);overflow:auto}
+.card{margin:auto;width:100%;max-width:480px;background:var(--card);color:var(--card-ink);border-radius:26px;padding:22px;box-shadow:0 0 0 4px rgba(255,255,255,.9),0 24px 60px rgba(0,0,0,.45);animation:pop .3s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.92);opacity:.4}to{transform:none;opacity:1}}
+.card h2{font-family:var(--font-display);font-weight:400;font-size:32px;line-height:1.05;margin:0;text-wrap:balance}
+.card p{margin:0}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--safranin-deep);margin-bottom:4px!important}
+.card .latin{color:var(--card-muted);font-size:14px}
+.profile-head{display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.portrait{width:86px;height:86px;flex:none;border-radius:50%;background:radial-gradient(circle,#f6efff,#ddc9fb);box-shadow:0 0 0 3px #fff,0 0 0 5px #e3d3fb}
+.facts{display:grid;gap:6px;margin:0 0 12px;padding:10px 12px;background:var(--card-2);border-radius:14px}
+.facts div{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px;align-items:baseline}
+.facts dt{font-size:11px;font-weight:800;color:var(--card-muted);text-transform:uppercase;letter-spacing:.08em}
+.facts dd{margin:0;font-weight:700;display:flex;flex-wrap:wrap;gap:2px 10px}
+.tag{display:block;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--safranin-deep);margin-bottom:2px}
+.block{margin-top:10px!important;line-height:1.45}
+.goal{margin-top:12px!important;font-weight:800;font-size:16px}
+.note{margin-top:12px;padding:10px 12px;border-radius:14px;background:var(--card-2);line-height:1.45}
+.actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
+.cta{font-family:var(--font-display);font-size:20px;color:#fff;background:linear-gradient(#ff7aa2,#e3336b);border:0;border-radius:999px;padding:9px 24px;box-shadow:0 4px 0 #a51c49;cursor:pointer}
+.cta:active{transform:translateY(2px);box-shadow:0 2px 0 #a51c49}
+.ghost{background:var(--card-2);color:var(--card-ink);border:0;border-radius:999px;padding:9px 18px;font-weight:800;cursor:pointer}
+.stars{display:flex;justify-content:center;gap:6px;margin:14px 0 6px}
+.stars svg{width:52px;height:52px}
+.stars svg:nth-child(2){transform:translateY(-8px);width:60px;height:60px}
+.score-line{text-align:center;font-weight:700;color:var(--card-muted)}
+.score-line strong{color:var(--card-ink);font-size:20px}
+.score-line+.score-line{margin-top:4px!important;font-size:14px}
+.tallies{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:12px}
+.tallies div{background:var(--card-2);border-radius:12px;padding:6px 4px;text-align:center;line-height:1.1}
+.tallies b{display:block;font-family:var(--font-display);font-weight:400;font-size:22px;font-variant-numeric:tabular-nums}
+.tallies span{font-size:11px;font-weight:800;color:var(--card-muted);text-transform:uppercase;letter-spacing:.06em}
+.plates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.plate{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border-radius:18px;border:0;background:var(--card-2);color:var(--card-ink);cursor:pointer}
+.plate img{width:60px;height:60px}
+.plate .pn{font-weight:800;line-height:1.1;text-align:center}
+.plate .ps{color:#e0a800;letter-spacing:2px;font-size:14px}
+.plate .pl{font-family:var(--font-display);font-size:26px;line-height:1;color:var(--safranin-deep)}
+.plate.boss{grid-column:1/-1;flex-direction:row;justify-content:center;gap:14px;background:linear-gradient(#ffe3ec,#ffc4d6)}
+.plate.boss .pl{font-size:20px}
+.plate[disabled]{opacity:.45;cursor:not-allowed}
+.how{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:10px}
+.how li{display:grid;grid-template-columns:40px minmax(0,1fr);gap:10px;align-items:center;line-height:1.35}
+.how img{width:40px;height:40px}
+.how b{display:block}
+.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;background:var(--card-2);border-radius:16px}
+.modes-wrap{margin-top:14px}
+.mode{border:0;background:transparent;border-radius:12px;padding:7px 6px;cursor:pointer;color:var(--card-ink);display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center;min-width:0}
+.mode b{font-family:var(--font-display);font-weight:400;font-size:18px;line-height:1.05}
+.mode small{font-size:11.5px;font-weight:700;color:var(--card-muted);line-height:1.2}
+.mode[aria-checked="true"]{background:#fff;box-shadow:inset 0 0 0 2px var(--safranin),0 2px 0 rgba(42,17,80,.15)}
+.mode[aria-checked="true"] b{color:var(--safranin-deep)}
+.mode:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.kbd{display:inline-block;font-size:12px;font-weight:800;padding:0 6px;border-radius:6px;background:var(--card-2);box-shadow:inset 0 -2px 0 #d8c6f2}
+.eletter{display:inline-grid;place-items:center;min-width:1.3em;height:1.3em;padding:0 .2em;margin-right:8px;border-radius:9px;background:var(--safranin);color:#fff;font-size:.78em;vertical-align:3px;box-shadow:0 2px 0 var(--safranin-deep)}
+
+@media (max-width:760px){
+  .app{height:auto;min-height:100%;grid-template-columns:minmax(0,1fr);grid-template-rows:none;gap:10px;grid-template-areas:"top" "hud" "board" "tray" "ticker" "side"}
+  .side{overflow:visible}
+  .board-wrap{aspect-ratio:1/1;width:100%;max-width:100%;min-height:0}
+  .brand{font-size:25px}
+  .tagline{font-size:10.5px;letter-spacing:.1em}
+  .btn{padding:4px 10px;font-size:13px}
+  .stat .num{font-size:23px}
+  .stat,.infect{border-radius:14px}
+  .label{font-size:10px;letter-spacing:.1em}
+  .ival{font-size:17px}
+  .drug img{width:36px;height:36px}
+  .drug .dn{font-size:11px}
+  .facts div{grid-template-columns:minmax(0,1fr);gap:0}
+  .tallies{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:400px){ .tagline{display:none} .chip{font-size:12px;padding:3px 10px} }
+@media (hover:none){ .drug .key{display:none} }
+@media (prefers-reduced-motion:reduce){ .card,.stat.time.low,.pfill.hot,.infect.bump,.tally b.bump{animation:none} .drug{transition:none} }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brandwrap"><h1 class="brand">Superbug <span>Smackdown</span></h1><p class="tagline">Whack the ESKAPE pathogens</p></div>
+    <span class="chip" id="level-chip">Plate 1</span>
+    <span class="spacer"></span>
+    <span class="tally" title="Your lifetime total on this device"><b id="tally">0</b> superbugs whacked</span>
+    <button class="btn" id="sound-btn" aria-pressed="true">Sound on</button>
+    <button class="btn" id="help-btn">How to play</button>
+    <button class="btn" id="plates-btn">Plates</button>
+    <button class="btn" id="restart-btn">Restart</button>
+  </header>
+  <section class="hud" aria-label="Status">
+    <div class="stat time"><span class="label">Time</span><span class="num" id="time">0</span></div>
+    <div class="stat"><span class="label">Score</span><span class="num"><span id="score">0</span><small id="mult"></small></span></div>
+    <div class="infect" id="infect"><div class="row"><span class="label">Infection</span><span class="ival" id="ival">0%</span></div>
+      <div class="ibar" role="progressbar" aria-label="Infection" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="ibar"><span class="ifill" id="ifill"></span><span class="mark" style="left:20%"><i>3★</i></span><span class="mark" style="left:50%"><i>2★</i></span></div></div>
+  </section>
+  <aside class="side">
+    <section class="panel pathogen" id="pathogen" aria-label="Pathogen profile"></section>
+    <section class="panel guide" aria-label="Field guide"><h3>On this plate</h3><ul id="guide"></ul></section>
+  </aside>
+  <main class="board-wrap"><noscript><p class="noscript">This preview can't run games. Open the link in a browser to play.</p></noscript><canvas id="board" aria-label="Culture plate with nine wells. Bugs pop up from the wells. Tap a well to whack it with the selected drug. Keys Q W E, A S D, Z X C whack the wells."></canvas></main>
+  <div class="tray" id="tray" role="radiogroup" aria-label="Choose your antibiotic"></div>
+  <div class="ticker"><span class="now" id="tick-now" aria-live="polite"></span><span class="prev" id="tick-prev"></span></div>
+</div>
+<div class="modal" id="modal" hidden></div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const canvas = $('#board'), g = canvas.getContext('2d'), wrap = $('.board-wrap'), modal = $('#modal'), app = $('.app'), tray = $('#tray');
+const TAU = Math.PI * 2;
+const RM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const FINE = !!(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches);
+const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const fmt = n => n.toLocaleString('en-GB');
+const DF = '"Lilita One","Arial Rounded MT Bold","Trebuchet MS",sans-serif';
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const WELL_KEYS = 'qweasdzxc';
+
+/* ---------------- Data ---------------- */
+const DRUGS = [
+  { key: 'PEN', name: 'Beta-lactams',     short: 'Beta-lactam',           eg: 'e.g. amoxicillin, meropenem', base: '#ff3b4e', light: '#ff9aa4', dark: '#c2142a', line: '#7e0d1c' },
+  { key: 'TET', name: 'Tetracyclines',    short: 'Tetra&shy;cycline',     eg: 'e.g. doxycycline',            base: '#ffcc2e', light: '#fff1a0', dark: '#de9800', line: '#855800' },
+  { key: 'MAC', name: 'Macrolides',       short: 'Macro&shy;lide',        eg: 'e.g. azithromycin',           base: '#3d8bff', light: '#a4ccff', dark: '#1d5ed1', line: '#0f3780' },
+  { key: 'QUI', name: 'Fluoroquinolones', short: 'Quino&shy;lone',        eg: 'e.g. ciprofloxacin',          base: '#22c96e', light: '#98f2bd', dark: '#12904c', line: '#0a5a2f' },
+  { key: 'AMI', name: 'Aminoglycosides',  short: 'Amino&shy;glycoside',   eg: 'e.g. gentamicin, injected',   base: '#a45cff', light: '#d9b6ff', dark: '#6d2fd0', line: '#3f1685' },
+  { key: 'SUL', name: 'Sulfonamides',     short: 'Sulfon&shy;amide',      eg: 'e.g. sulfamethoxazole',       base: '#ff8a2a', light: '#ffc995', dark: '#d65e05', line: '#843700' },
+  { key: 'AV',  name: 'Antivirals',       short: 'Anti&shy;viral',        eg: 'e.g. oseltamivir for flu',    base: '#3fd0e0', light: '#b4f3fa', dark: '#1597a8', line: '#0a5560', antiviral: true }
+];
+const DIDX = Object.fromEntries(DRUGS.map((d, i) => [d.key, i]));
+const AV = DIDX.AV;
+const PILL_ROT = [-Math.PI / 4, 0, -0.35, 0, 0, Math.PI / 4, 0.6];
+const SPECIES = {
+  efae:   { name: 'VRE', full: 'Vancomycin-resistant <i>Enterococcus faecium</i>', stain: 'Gram-positive cocci in pairs and short chains', hp: 1, res: ['PEN', 'AMI'], color: '#ff8a3a' },
+  mrsa:   { name: 'MRSA', full: 'Methicillin-resistant <i>Staphylococcus aureus</i>', stain: 'Gram-positive cocci in grape-like clusters', hp: 2, res: ['PEN'], color: '#ffc531' },
+  kleb:   { name: 'Klebsiella', full: 'Carbapenem-resistant <i>Klebsiella pneumoniae</i>', stain: 'Gram-negative rods wrapped in a thick, sticky capsule', hp: 2, res: ['PEN', 'QUI'], color: '#ff4f7a' },
+  crab:   { name: 'CRAB', full: 'Carbapenem-resistant <i>Acinetobacter baumannii</i>', stain: 'Gram-negative coccobacilli', hp: 3, res: ['PEN', 'QUI'], color: '#8f7bd6' },
+  pseudo: { name: 'Pseudomonas', full: 'Multidrug-resistant <i>Pseudomonas aeruginosa</i>', stain: 'Gram-negative rods with one whip-like flagellum', hp: 2, res: ['PEN', 'TET'], slime: true, color: '#22b5a0' },
+  entb:   { name: 'Enterobacter', full: '<i>Enterobacter cloacae</i> complex', stain: 'Gram-negative rods with flagella all over', hp: 2, res: ['PEN'], color: '#d9873a' }
+};
+const ESKAPE_INTRO = 'Six hospital superbugs, named because they escape antibiotics: <i>Enterococcus faecium</i>, <i>Staphylococcus aureus</i>, <i>Klebsiella pneumoniae</i>, <i>Acinetobacter baumannii</i>, <i>Pseudomonas aeruginosa</i> and <i>Enterobacter</i>. Each plate is one of them.';
+const PLATES = [
+  { letter: 'E', main: 'efae', sp: ['efae'], tray: ['PEN', 'TET', 'MAC'], time: 40, gap: [1.1, 0.62], maxUp: [1, 3], up: [1.7, 1.2], mix: {}, powers: [],
+    rule: 'Pick a drug from the tray, then whack bugs as they pop up. Shields above a bug show the drugs it resists, so a resisted hit just clanks off. Every bug that escapes raises the infection.',
+    real: 'Enterococcus faecium lives harmlessly in the gut but causes hard-to-treat hospital infections. VRE also resists vancomycin, an antibiotic often kept in reserve for serious infections.',
+    note: 'Antibiotics don\'t work on viruses like colds and flu. Taking them anyway gives resistant bacteria an advantage.' },
+  { letter: 'S', main: 'mrsa', sp: ['mrsa'], tray: ['PEN', 'TET', 'MAC'], time: 45, gap: [1.15, 0.7], maxUp: [1, 3], up: [1.6, 1.15], mix: { good: 0.15 }, powers: [],
+    rule: 'MRSA takes two hits. About 1 in 8 bugs that survive a hit mutate and resist that drug from then on, so watch for a new shield and switch drugs if one appears. Friendly gut bacteria start popping up too. Leave them alone.',
+    real: 'MRSA resists methicillin and nearly all other beta-lactam antibiotics. It often lives harmlessly on skin but can cause serious infections, especially in hospitals.',
+    note: 'When a dose kills most bacteria but not all, the survivors are the toughest ones. That is how resistance gets selected.' },
+  { letter: 'K', main: 'kleb', sp: ['kleb'], tray: ['PEN', 'TET', 'MAC', 'QUI', 'AV'], time: 45, gap: [1.15, 0.7], maxUp: [1, 3], up: [1.6, 1.15], mix: { good: 0.1, virus: 0.13 }, powers: [], divide: true,
+    rule: 'Klebsiella multiplies. A bug that escapes comes straight back with a twin that inherits every resistance it had. Flu viruses appear too. Antibiotics do nothing to them, so switch to the antiviral.',
+    real: 'Klebsiella pneumoniae causes pneumonia and bloodstream infections in hospitals. Some strains make KPC, an enzyme named after the bug itself, which destroys carbapenems, often a last line of defence.',
+    note: 'In ideal conditions some bacteria can double in about 20 minutes, so an untreated infection grows fast.' },
+  { letter: 'A', main: 'crab', sp: ['crab'], tray: ['PEN', 'TET', 'MAC', 'AMI', 'AV'], time: 45, gap: [1.35, 0.9], maxUp: [1, 2], up: [1.6, 1.2], mix: { good: 0.08, virus: 0.1, power: 0.08 }, powers: ['phage'], pressure: true,
+    rule: 'Acinetobacter takes three hits. From now on every hit adds selection pressure. When a drug\'s bar is full, survivors mutate 1 in 3 times instead of 1 in 8, and new bugs can arrive already resistant. Whack a phage to wipe out every bug on the plate.',
+    real: 'Acinetobacter baumannii can survive for weeks on dry hospital surfaces. Carbapenem-resistant strains, known as CRAB, are on the WHO list of critical priority bacteria.',
+    note: 'Handwashing and cleaning hospital surfaces stop bugs like Acinetobacter spreading between patients.' },
+  { letter: 'P', main: 'pseudo', sp: ['pseudo'], tray: ['PEN', 'TET', 'QUI', 'AMI', 'AV'], time: 45, gap: [1.25, 0.8], maxUp: [1, 3], up: [1.6, 1.15], mix: { good: 0.08, virus: 0.1, power: 0.09 }, powers: ['phage', 'soap'], pressure: true,
+    rule: 'Biofilm slime soaks up the first hit of any drug. Strip it away, then treat the bug underneath. Whack the soap to wash the infection down.',
+    real: 'Pseudomonas builds biofilms, slimy layers that help it survive antibiotics. Its blue-green pigment, pyocyanin, can tint infected wounds.',
+    note: 'Biofilms grow on catheters and implants, and in the lungs of people with cystic fibrosis.' },
+  { letter: 'E', main: 'entb', sp: ['entb', 'entb', 'kleb'], tray: ['PEN', 'TET', 'QUI', 'SUL', 'AV'], time: 45, gap: [1.0, 0.62], maxUp: [2, 4], up: [1.6, 1.15], mix: { good: 0.08, virus: 0.08, power: 0.07 }, powers: ['phage', 'soap'], pressure: true, plasmid: true,
+    rule: 'Bugs that pop up side by side can swap plasmids, small rings of DNA that carry resistance genes, even between species. Hit them before they pair up.',
+    real: 'Enterobacter carries a hidden resistance gene called AmpC. Treatment with some beta-lactams can select mutants that switch it on for good, so resistance can appear mid-treatment.',
+    note: 'In 2019, drug-resistant bacterial infections directly caused an estimated 1.27 million deaths worldwide. Prevention, testing and new treatments such as phage therapy all help.' },
+  { letter: null, main: 'kleb', sp: ['kleb'], tray: ['PEN', 'TET', 'MAC', 'QUI', 'AV'], time: 60, gap: [1.3, 0.85], maxUp: [1, 3], up: [1.6, 1.2], mix: { good: 0.14, virus: 0.14, power: 0.12 }, powers: ['phage', 'soap'], pressure: true,
+    boss: { hp: 10, name: 'The NDM-1 colony', full: '<i>Klebsiella pneumoniae</i> carrying the NDM-1 resistance gene' },
+    rule: 'The colony sits in the centre well and takes {HP} hits. It adapts to the last two drugs that hit it, so keep rotating. It buds off new bugs that inherit its resistance, and a phage hits it twice. Destroy it before time runs out.',
+    real: 'NDM-1 is a gene that lets bacteria such as Klebsiella pneumoniae destroy carbapenems, often a last-resort antibiotic. It travels on plasmids, so it can spread between bacteria.',
+    note: 'You\'ve beaten all six ESKAPE pathogens. There is no single fix for resistance: careful prescribing, preventing infections and funding new treatments all help keep antibiotics working.' }
+];
+PLATES.forEach(L => { L.trayIdx = L.tray.map(k => DIDX[k]); L.abx = L.trayIdx.filter(d => d !== AV); });
+const plateName = L => L.boss ? L.boss.name : SPECIES[L.main].name;
+const LOSE_FACTS = [
+  'Alexander Fleming warned in his 1945 Nobel lecture that misusing penicillin could breed resistant microbes.',
+  'Handwashing and vaccines stop infections before they start, so fewer antibiotics are needed.',
+  'Resistant bacteria move between people, animals, food and the environment, so tackling resistance takes all of them.',
+  'Antibiotics also kill helpful gut bacteria. That can let harmful bugs such as <i>C. difficile</i> take over.',
+  'Antivirals are specific too. Oseltamivir can shorten flu but does nothing to bacteria, and there is no antiviral for the common cold.'
+];
+const PMAX = 6;
+const MODES = {
+  easy:   { key: 'easy',   name: 'Easy',   desc: 'Slower bugs. Shields always shown.',         gap: 1.3,  up: 1.3,  maxUp: -1, esc: 6,  flu: 3, hideFrom: 99, bossHp: 8 },
+  medium: { key: 'medium', name: 'Medium', desc: 'Shields hidden from plate 3 until tested.', gap: 1,    up: 1,    maxUp: 0,  esc: 8,  flu: 4, hideFrom: 2,  bossHp: 10 },
+  hard:   { key: 'hard',   name: 'Hard',   desc: 'Faster bugs. Shields always hidden.',       gap: 0.82, up: 0.82, maxUp: 1,  esc: 10, flu: 5, hideFrom: 0,  bossHp: 12 }
+};
+const POWERS = new Set(['phage', 'soap', 'test', 'vax']);
+
+/* ---------------- Progress ---------------- */
+const SAVE = 'superbug-smackdown-v1';
+let prog = { unlocked: 1, stars: { easy: [], medium: [], hard: [] }, best: { easy: [], medium: [], hard: [] }, defeated: 0, mode: 'medium' };
+try {
+  const s = JSON.parse(localStorage.getItem(SAVE));
+  if (s && s.unlocked) {
+    prog.unlocked = s.unlocked; prog.defeated = s.defeated || 0; if (MODES[s.mode]) prog.mode = s.mode;
+    for (const key of ['stars', 'best']) {
+      if (Array.isArray(s[key])) prog[key].medium = s[key];
+      else if (s[key] && typeof s[key] === 'object') for (const m in prog[key]) if (Array.isArray(s[key][m])) prog[key][m] = s[key][m];
+    }
+  }
+} catch (e) {}
+const saveProg = () => { try { localStorage.setItem(SAVE, JSON.stringify(prog)); } catch (e) {} };
+
+/* ---------------- Sound (shared with Superbug Showdown) ---------------- */
+let actx = null, master = null, muted = false;
+try { muted = localStorage.getItem('superbug-swap-muted') === '1'; } catch (e) {}
+function audio() {
+  if (muted) return null;
+  try {
+    if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; actx = new AC(); master = actx.createGain(); master.gain.value = 0.5; master.connect(actx.destination); }
+    if (actx.state === 'suspended') actx.resume();
+    return actx;
+  } catch (e) { return null; }
+}
+function tone(freq, dur, { type = 'sine', vol = 0.3, slide = 0, delay = 0, attack = 0.005 } = {}) {
+  const a = audio(); if (!a) return;
+  const t0 = a.currentTime + delay, o = a.createOscillator(), gn = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq * slide), t0 + dur);
+  gn.gain.setValueAtTime(0.0001, t0); gn.gain.exponentialRampToValueAtTime(vol, t0 + attack); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(gn); gn.connect(master); o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function noise(dur, { vol = 0.25, freq = 800, q = 1, delay = 0, type = 'bandpass', slide = 0 } = {}) {
+  const a = audio(); if (!a) return;
+  const t0 = a.currentTime + delay, len = Math.ceil(a.sampleRate * dur), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = a.createBufferSource(); src.buffer = buf;
+  const f = a.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); if (slide) f.frequency.exponentialRampToValueAtTime(freq * slide, t0 + dur); f.Q.value = q;
+  const gn = a.createGain(); gn.gain.setValueAtTime(vol, t0); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f); f.connect(gn); gn.connect(master); src.start(t0);
+}
+const SFX = {
+  swap: () => tone(520, 0.08, { type: 'triangle', vol: 0.12, slide: 1.3 }),
+  bad: () => tone(180, 0.16, { type: 'square', vol: 0.07, slide: 0.7 }),
+  pop: w => { const f = 440 * Math.pow(2, Math.min(8, (w || 1) - 1) * 2 / 12); tone(f, 0.12, { type: 'triangle', vol: 0.18, slide: 1.5 }); tone(f * 1.5, 0.1, { vol: 0.08, delay: 0.03 }); },
+  kill: () => { noise(0.28, { vol: 0.35, freq: 900, q: 0.8, slide: 0.25 }); tone(260, 0.3, { type: 'sawtooth', vol: 0.09, slide: 0.35 }); },
+  resist: () => { tone(1250, 0.18, { type: 'square', vol: 0.05 }); tone(1870, 0.14, { type: 'square', vol: 0.035, delay: 0.01 }); noise(0.06, { vol: 0.15, freq: 4000, q: 3 }); },
+  mutate: () => { for (let i = 0; i < 4; i++) tone(300 + i * 90, 0.09, { type: 'sawtooth', vol: 0.07, delay: i * 0.06, slide: 1.25 }); },
+  slime: () => noise(0.22, { vol: 0.3, freq: 300, q: 2, slide: 2.5, type: 'lowpass' }),
+  special: () => [0, 4, 7, 12].forEach((n, i) => tone(660 * Math.pow(2, n / 12), 0.14, { type: 'triangle', vol: 0.1, delay: i * 0.05 })),
+  scan: () => tone(400, 0.25, { type: 'sawtooth', vol: 0.07, slide: 3 }),
+  vax: () => [0, 7, 12, 19].forEach((n, i) => tone(523 * Math.pow(2, n / 12), 0.32, { vol: 0.12, delay: i * 0.07 })),
+  breaker: () => { noise(0.12, { vol: 0.3, freq: 3000, q: 2 }); tone(1046, 0.4, { type: 'triangle', vol: 0.12, delay: 0.08 }); tone(1568, 0.4, { type: 'triangle', vol: 0.08, delay: 0.14 }); },
+  blast: () => { noise(0.35, { vol: 0.32, freq: 300, q: 0.7, type: 'lowpass' }); tone(120, 0.3, { vol: 0.25, slide: 0.5 }); },
+  zap: () => { for (let i = 0; i < 3; i++) tone(900 - i * 200, 0.12, { type: 'sawtooth', vol: 0.06, delay: i * 0.04, slide: 0.5 }); },
+  divide: () => { tone(220, 0.14, { vol: 0.2, slide: 1.8 }); tone(330, 0.16, { vol: 0.14, delay: 0.08, slide: 1.6 }); },
+  plasmid: () => { tone(500, 0.2, { vol: 0.12, slide: 2 }); tone(750, 0.2, { vol: 0.08, delay: 0.1, slide: 0.6 }); },
+  win: () => [0, 4, 7, 12, 16].forEach((n, i) => tone(523 * Math.pow(2, n / 12), 0.35, { type: 'triangle', vol: 0.16, delay: i * 0.1 })),
+  lose: () => [0, -3, -7, -12].forEach((n, i) => tone(392 * Math.pow(2, n / 12), 0.3, { type: 'triangle', vol: 0.14, delay: i * 0.14 }))
+};
+const lastSfx = {};
+function sfx(name, arg) {
+  if (muted) return;
+  const now = performance.now(); if (now - (lastSfx[name] || 0) < 45) return; lastSfx[name] = now;
+  try { SFX[name](arg); } catch (e) {}
+}
+const soundBtn = $('#sound-btn');
+function renderSound() { soundBtn.textContent = muted ? 'Sound off' : 'Sound on'; soundBtn.setAttribute('aria-pressed', String(!muted)); }
+soundBtn.addEventListener('click', () => { muted = !muted; try { localStorage.setItem('superbug-swap-muted', muted ? '1' : '0'); } catch (e) {} renderSound(); if (!muted) sfx('swap'); });
+renderSound();
+let unlocked = false;
+function unlockAudio() {
+  if (muted) return;
+  const a = audio(); if (!a) return;
+  try { if (a.state !== 'running') a.resume(); } catch (e) {}
+  if (!unlocked) { try { const b = a.createBuffer(1, 1, 22050), src = a.createBufferSource(); src.buffer = b; src.connect(a.destination); src.start(0); unlocked = true; } catch (e) {} }
+}
+['touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && actx && actx.state !== 'running' && !muted) { try { actx.resume(); } catch (e) {} } });
+Object.assign(SFX, {
+  whoosh: () => noise(0.08, { vol: 0.12, freq: 2200, q: 0.8, slide: 0.35 }),
+  thunk: () => { tone(150, 0.12, { type: 'triangle', vol: 0.28, slide: 0.55 }); noise(0.05, { vol: 0.18, freq: 600, q: 1 }); },
+  boing: () => tone(260, 0.28, { vol: 0.16, slide: 2.4 }),
+  sad: () => [0, -3, -7].forEach((n, i) => tone(587 * Math.pow(2, n / 12), 0.18, { type: 'triangle', vol: 0.11, delay: i * 0.09 })),
+  escape: () => { tone(420, 0.22, { type: 'sawtooth', vol: 0.06, slide: 0.5 }); noise(0.15, { vol: 0.12, freq: 400, q: 1, type: 'lowpass' }); },
+  tick: () => tone(1320, 0.05, { type: 'square', vol: 0.035 }),
+  go: () => [0, 7, 12].forEach((n, i) => tone(523 * Math.pow(2, n / 12), 0.16, { type: 'triangle', vol: 0.12, delay: i * 0.07 }))
+});
+function updateTally(bump) {
+  const el = $('#tally'); el.textContent = fmt(prog.defeated || 0);
+  if (bump && !RM) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+}
+
+/* ---------------- Drawing (shared with Superbug Showdown) ---------------- */
+function rrSub(c, x, y, w, h, r) { r = Math.max(0, Math.min(r, w / 2, h / 2)); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function rrp(c, x, y, w, h, r) { c.beginPath(); rrSub(c, x, y, w, h, r); }
+function shieldPath(c, x, y, s) {
+  c.beginPath(); c.moveTo(x, y - s);
+  c.quadraticCurveTo(x + s * 0.9, y - s * 0.8, x + s * 0.9, y - s * 0.3);
+  c.quadraticCurveTo(x + s * 0.8, y + s * 0.55, x, y + s);
+  c.quadraticCurveTo(x - s * 0.8, y + s * 0.55, x - s * 0.9, y - s * 0.3);
+  c.quadraticCurveTo(x - s * 0.9, y - s * 0.8, x, y - s); c.closePath();
+}
+function radial(c, cx, cy, r, light, base, dark) {
+  const gr = c.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.08, cx, cy, r);
+  gr.addColorStop(0, light); gr.addColorStop(0.55, base); gr.addColorStop(1, dark); return gr;
+}
+
+function drawPill(c, color, cx, cy, s, special, t) {
+  const d = DRUGS[color], u = s * 0.36;
+  const rot = [-Math.PI / 4, 0, -0.35, 0, 0, Math.PI / 4][color];
+  const build = () => {
+    c.beginPath();
+    if (color === 0) rrSub(c, -1.15 * u, -0.56 * u, 2.3 * u, 1.12 * u, 0.56 * u);
+    else if (color === 1) c.arc(0, 0, 0.92 * u, 0, TAU);
+    else if (color === 2) c.ellipse(0, 0, 1.06 * u, 0.74 * u, 0, 0, TAU);
+    else if (color === 3) { for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + Math.PI / 6, px = Math.cos(a) * 0.98 * u, py = Math.sin(a) * 0.98 * u; if (i) c.lineTo(px, py); else c.moveTo(px, py); } c.closePath(); }
+    else if (color === 4) rrSub(c, -0.6 * u, -0.42 * u, 1.2 * u, 1.38 * u, 0.32 * u);
+    else rrSub(c, -0.72 * u, -0.72 * u, 1.44 * u, 1.44 * u, 0.3 * u);
+  };
+  c.save(); c.translate(cx, cy);
+  c.save(); c.rotate(rot);
+  c.lineJoin = 'round';
+  c.save(); c.translate(0.05 * u, 0.12 * u); build(); c.fillStyle = 'rgba(16,0,36,.35)'; c.fill(); c.restore();
+  if (color === 4) {
+    rrp(c, -0.34 * u, -0.7 * u, 0.68 * u, 0.32 * u, 0.08 * u); c.fillStyle = '#d7dcea'; c.fill(); c.lineWidth = 0.08 * u; c.strokeStyle = '#4a4f66'; c.stroke();
+    const cg = c.createLinearGradient(0, -1.08 * u, 0, -0.68 * u); cg.addColorStop(0, '#ffffff'); cg.addColorStop(1, '#98a1bc');
+    rrp(c, -0.52 * u, -1.08 * u, 1.04 * u, 0.4 * u, 0.14 * u); c.fillStyle = cg; c.fill(); c.stroke();
+  }
+  build();
+  const gr = c.createLinearGradient(0, -u, 0, u); gr.addColorStop(0, d.light); gr.addColorStop(0.45, d.base); gr.addColorStop(1, d.dark);
+  c.fillStyle = gr; c.fill();
+  if (color === 0) {
+    c.save(); build(); c.clip();
+    const wg = c.createLinearGradient(0, -u, 0, u); wg.addColorStop(0, '#ffffff'); wg.addColorStop(0.5, '#fff1f2'); wg.addColorStop(1, '#d9c3c7');
+    c.fillStyle = wg; c.fillRect(0, -u, 1.3 * u, 2 * u); c.fillStyle = 'rgba(0,0,0,.14)'; c.fillRect(-0.04 * u, -u, 0.08 * u, 2 * u); c.restore();
+  }
+  c.strokeStyle = 'rgba(0,0,0,.2)'; c.lineWidth = 0.08 * u; c.lineCap = 'round';
+  if (color === 1) { c.beginPath(); c.moveTo(-0.6 * u, 0.04 * u); c.lineTo(0.6 * u, 0.04 * u); c.stroke(); }
+  else if (color === 5) { c.beginPath(); c.moveTo(-0.42 * u, 0); c.lineTo(0.42 * u, 0); c.moveTo(0, -0.42 * u); c.lineTo(0, 0.42 * u); c.stroke(); }
+  else if (color === 4) { c.fillStyle = 'rgba(255,255,255,.82)'; c.fillRect(-0.6 * u, 0.1 * u, 1.2 * u, 0.34 * u); }
+  else if (color === 3) { c.beginPath(); c.arc(0, 0, 0.5 * u, 0, TAU); c.stroke(); }
+  build(); c.lineWidth = 0.1 * u; c.strokeStyle = d.line; c.stroke();
+  c.save(); build(); c.clip(); c.beginPath(); c.ellipse(-0.34 * u, -0.4 * u, 0.46 * u, 0.2 * u, -0.45, 0, TAU); c.fillStyle = 'rgba(255,255,255,.6)'; c.fill(); c.restore();
+  if (special === 'scanH' || special === 'scanV') {
+    c.save(); build(); c.clip(); c.rotate(-rot); c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 0.15 * u;
+    for (let k = -3; k <= 3; k++) { c.beginPath(); if (special === 'scanH') { c.moveTo(-2 * u, k * 0.36 * u); c.lineTo(2 * u, k * 0.36 * u); } else { c.moveTo(k * 0.36 * u, -2 * u); c.lineTo(k * 0.36 * u, 2 * u); } c.stroke(); }
+    c.restore();
+  }
+  c.restore();
+  if (special === 'scanH' || special === 'scanV') {
+    const off = 1.18 * u + (RM ? 0 : Math.sin(t * 6) * 0.06 * u);
+    for (const sg of [-1, 1]) {
+      c.save();
+      if (special === 'scanH') { c.translate(sg * off, 0); c.rotate(sg > 0 ? 0 : Math.PI); } else { c.translate(0, sg * off); c.rotate(sg > 0 ? Math.PI / 2 : -Math.PI / 2); }
+      c.beginPath(); c.moveTo(0.22 * u, 0); c.lineTo(-0.1 * u, -0.2 * u); c.lineTo(-0.1 * u, 0.2 * u); c.closePath();
+      c.fillStyle = '#fff'; c.fill(); c.lineWidth = 0.06 * u; c.strokeStyle = d.line; c.stroke(); c.restore();
+    }
+  } else if (special === 'combo') {
+    c.beginPath(); c.arc(0, 0, 1.24 * u, 0, TAU); c.strokeStyle = 'rgba(255,255,255,.92)'; c.lineWidth = 0.12 * u;
+    c.setLineDash([0.28 * u, 0.2 * u]); c.lineDashOffset = RM ? 0 : -t * u; c.stroke(); c.setLineDash([]);
+    const bx = 0.82 * u, by = -0.82 * u;
+    c.beginPath(); c.arc(bx, by, 0.34 * u, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 0.07 * u; c.strokeStyle = d.line; c.stroke();
+    c.strokeStyle = d.dark; c.lineWidth = 0.12 * u; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(bx - 0.17 * u, by); c.lineTo(bx + 0.17 * u, by); c.moveTo(bx, by - 0.17 * u); c.lineTo(bx, by + 0.17 * u); c.stroke();
+  } else if (special === 'vax') {
+    const pr = 1.22 * u + (RM ? 0 : Math.sin(t * 5) * 0.04 * u);
+    c.beginPath(); c.arc(0, 0, pr, 0, TAU); c.strokeStyle = 'rgba(150,230,255,.35)'; c.lineWidth = 0.32 * u; c.stroke();
+    c.beginPath(); c.arc(0, 0, pr, 0, TAU); c.strokeStyle = '#bff0ff'; c.lineWidth = 0.09 * u; c.stroke();
+    c.save(); c.translate(0.78 * u, 0.8 * u);
+    c.beginPath(); c.arc(0, 0, 0.38 * u, 0, TAU); c.fillStyle = '#ffffff'; c.fill(); c.lineWidth = 0.06 * u; c.strokeStyle = '#1f6f8b'; c.stroke();
+    c.rotate(-Math.PI / 4);
+    rrp(c, -0.2 * u, -0.08 * u, 0.32 * u, 0.16 * u, 0.04 * u); c.fillStyle = '#9fe6ff'; c.fill(); c.lineWidth = 0.04 * u; c.strokeStyle = '#1f6f8b'; c.stroke();
+    c.beginPath(); c.moveTo(-0.2 * u, 0); c.lineTo(-0.3 * u, 0); c.moveTo(-0.3 * u, -0.08 * u); c.lineTo(-0.3 * u, 0.08 * u); c.moveTo(0.12 * u, 0); c.lineTo(0.3 * u, 0); c.stroke();
+    c.restore();
+  }
+  c.restore();
+}
+function drawPhage(c, cx, cy, s, t) {
+  const u = s * 0.36;
+  c.save(); c.translate(cx, cy + (RM ? 0 : Math.sin(t * 3) * 0.05 * u));
+  const pulse = RM ? 1 : 1 + Math.sin(t * 4) * 0.08;
+  const aura = c.createRadialGradient(0, -0.2 * u, 0.1 * u, 0, -0.2 * u, 1.35 * u * pulse);
+  aura.addColorStop(0, 'rgba(255,120,170,.55)'); aura.addColorStop(1, 'rgba(255,120,170,0)');
+  c.fillStyle = aura; c.beginPath(); c.arc(0, -0.2 * u, 1.35 * u * pulse, 0, TAU); c.fill();
+  c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = '#1f5a6e'; c.lineWidth = 0.08 * u;
+  for (const sd of [-1, 1]) for (let k = 0; k < 3; k++) {
+    c.beginPath(); c.moveTo(sd * 0.12 * u, 0.9 * u); c.lineTo(sd * (0.42 + k * 0.12) * u, (1.02 + k * 0.03) * u); c.lineTo(sd * (0.52 + k * 0.16) * u, 1.26 * u); c.stroke();
+  }
+  rrp(c, -0.32 * u, 0.84 * u, 0.64 * u, 0.12 * u, 0.05 * u); c.fillStyle = '#9ad9e6'; c.fill(); c.stroke();
+  rrp(c, -0.13 * u, 0.18 * u, 0.26 * u, 0.68 * u, 0.06 * u); c.fillStyle = '#c4ecf4'; c.fill(); c.stroke();
+  c.lineWidth = 0.04 * u; for (let y = 0.3; y < 0.84; y += 0.12) { c.beginPath(); c.moveTo(-0.13 * u, y * u); c.lineTo(0.13 * u, y * u); c.stroke(); }
+  c.lineWidth = 0.08 * u; rrp(c, -0.22 * u, 0.06 * u, 0.44 * u, 0.13 * u, 0.04 * u); c.fillStyle = '#9ad9e6'; c.fill(); c.stroke();
+  const hy = -0.5 * u, hr = 0.62 * u;
+  c.beginPath(); for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + i * Math.PI / 3; const px = Math.cos(a) * hr, py = hy + Math.sin(a) * hr; if (i) c.lineTo(px, py); else c.moveTo(px, py); } c.closePath();
+  c.fillStyle = radial(c, 0, hy, hr, '#ffffff', '#8fdcec', '#3a9db8'); c.fill(); c.lineWidth = 0.08 * u; c.stroke();
+  c.strokeStyle = 'rgba(31,90,110,.35)'; c.lineWidth = 0.04 * u;
+  for (let i = 0; i < 6; i += 2) { const a = -Math.PI / 2 + i * Math.PI / 3; c.beginPath(); c.moveTo(0, hy); c.lineTo(Math.cos(a) * hr, hy + Math.sin(a) * hr); c.stroke(); }
+  const tw = RM ? 1 : 0.6 + Math.abs(Math.sin(t * 5)) * 0.6;
+  c.fillStyle = '#fff'; c.save(); c.translate(0.62 * u, -0.98 * u); c.scale(tw, tw); c.beginPath();
+  c.moveTo(0, -0.2 * u); c.lineTo(0.05 * u, -0.05 * u); c.lineTo(0.2 * u, 0); c.lineTo(0.05 * u, 0.05 * u); c.lineTo(0, 0.2 * u); c.lineTo(-0.05 * u, 0.05 * u); c.lineTo(-0.2 * u, 0); c.lineTo(-0.05 * u, -0.05 * u); c.closePath(); c.fill(); c.restore();
+  c.restore();
+}
+/* Organic membrane: superellipse with a slow wobble, so cells look alive rather than geometric */
+function sePath(c, x, y, rx, ry, n, seed, t, amp, lobes = 5) {
+  c.beginPath();
+  const N = 34, e = 2 / n;
+  for (let i = 0; i <= N; i++) {
+    const a = i / N * TAU, ca = Math.cos(a), sa = Math.sin(a);
+    const w = 1 + amp * (Math.sin(a * lobes + seed + t * 1.7) + 0.6 * Math.sin(a * (lobes + 2) - seed * 1.3 - t * 1.2));
+    const px = x + Math.sign(ca) * Math.pow(Math.abs(ca), e) * rx * w, py = y + Math.sign(sa) * Math.pow(Math.abs(sa), e) * ry * w;
+    if (i) c.lineTo(px, py); else c.moveTo(px, py);
+  }
+  c.closePath();
+}
+function shade(c, path, x, y, r, col, u) {
+  path(); c.fillStyle = radial(c, x, y, r, col[0], col[1], col[2]); c.fill();
+  c.save(); path(); c.clip();
+  path(); c.lineWidth = Math.min(0.34 * u, r * 0.5); c.strokeStyle = 'rgba(0,0,0,.28)'; c.stroke();
+  c.beginPath(); c.ellipse(x - r * 0.38, y - r * 0.42, r * 0.3, r * 0.13, -0.5, 0, TAU); c.fillStyle = 'rgba(255,255,255,.5)'; c.fill();
+  c.beginPath(); c.arc(x - r * 0.08, y - r * 0.56, r * 0.05, 0, TAU); c.fill();
+  c.restore();
+}
+function tendril(c, pts, w0, w1, color) {
+  c.strokeStyle = color; c.lineCap = 'round';
+  for (let i = 1; i < pts.length; i++) { c.lineWidth = w0 + (w1 - w0) * (i / (pts.length - 1)); c.beginPath(); c.moveTo(pts[i - 1][0], pts[i - 1][1]); c.lineTo(pts[i][0], pts[i][1]); c.stroke(); }
+}
+function blotches(c, path, list, color, u) {
+  c.save(); path(); c.clip(); c.fillStyle = color;
+  for (const [x, y, r] of list) { c.beginPath(); c.ellipse(x * u, y * u, r * u, r * 0.8 * u, x + y, 0, TAU); c.fill(); }
+  c.restore();
+}
+
+function face(c, s, mood, blink, t = 0, taunt = false) {
+  const ex = s * 0.36, ey = -s * 0.12;
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  if (mood === 'hurt') {
+    c.strokeStyle = '#14040a'; c.lineWidth = s * 0.12;
+    for (const sx of [-1, 1]) { const x = sx * ex; c.beginPath(); c.moveTo(x - s * 0.12, ey - s * 0.12); c.lineTo(x + s * 0.12, ey + s * 0.12); c.moveTo(x + s * 0.12, ey - s * 0.12); c.lineTo(x - s * 0.12, ey + s * 0.12); c.stroke(); }
+    c.beginPath(); c.ellipse(0, s * 0.42, s * 0.2, s * 0.17, 0, 0, TAU); c.fillStyle = '#3b0414'; c.fill(); c.lineWidth = s * 0.07; c.stroke();
+    return;
+  }
+  for (const sx of [-1, 1]) {
+    c.save(); c.translate(sx * ex, ey); c.scale(-sx, 1); c.rotate(0.3);
+    const w = s * 0.27, h = blink ? s * 0.025 : s * 0.13;
+    const eye = () => { c.beginPath(); c.moveTo(-w, -h * 0.2); c.quadraticCurveTo(0, -h * 1.5, w, h * 0.25); c.quadraticCurveTo(-w * 0.1, h * 1.7, -w, -h * 0.2); c.closePath(); };
+    eye(); const sg = c.createRadialGradient(0, 0, 0, 0, 0, w); sg.addColorStop(0, '#fff7a8'); sg.addColorStop(0.7, '#f2cf1a'); sg.addColorStop(1, '#bf7600'); c.fillStyle = sg; c.fill();
+    if (!blink) {
+      c.save(); eye(); c.clip();
+      c.beginPath(); c.arc(w * 0.15, h * 0.15, s * 0.1, 0, TAU); c.fillStyle = '#e3200e'; c.fill();
+      c.beginPath(); c.ellipse(w * 0.15, h * 0.15, s * 0.034, s * 0.09, 0, 0, TAU); c.fillStyle = '#120205'; c.fill();
+      c.beginPath(); c.arc(w * 0.15 - s * 0.045, h * 0.15 - s * 0.05, s * 0.022, 0, TAU); c.fillStyle = '#fff'; c.fill();
+      c.restore();
+    }
+    eye(); c.lineWidth = s * 0.06; c.strokeStyle = '#14040a'; c.stroke();
+    c.beginPath(); c.moveTo(-w * 1.2, -h * 0.9 - s * 0.1); c.quadraticCurveTo(0, -h * 1.9 - s * 0.13, w * 1.25, -h * 0.2 - s * 0.05); c.lineWidth = s * 0.13; c.stroke();
+    c.restore();
+  }
+  const mw = s * 0.68, y0 = s * 0.26, yu = s * 0.4, yl = s * 0.72;
+  const lip = (yc, q) => y0 + 2 * q * (1 - q) * (yc - y0), lx = q => mw / 2 * (2 * q - 1);
+  const mouth = () => { c.beginPath(); c.moveTo(-mw / 2, y0); c.quadraticCurveTo(0, yu, mw / 2, y0); c.quadraticCurveTo(0, yl, -mw / 2, y0); c.closePath(); };
+  mouth(); c.fillStyle = '#3b0414'; c.fill();
+  c.save(); mouth(); c.clip(); c.fillStyle = '#fff4dc'; c.strokeStyle = 'rgba(60,10,20,.6)'; c.lineWidth = s * 0.02;
+  for (let k = 0; k < 6; k++) { const a = k / 6, b = (k + 1) / 6, m = (a + b) / 2; c.beginPath(); c.moveTo(lx(a), lip(yu, a) - s * 0.03); c.lineTo(lx(b), lip(yu, b) - s * 0.03); c.lineTo(lx(m), lip(yu, m) + s * 0.11); c.closePath(); c.fill(); c.stroke(); }
+  for (let k = 0; k < 5; k++) { const a = 0.08 + k * 0.168, b = a + 0.168, m = (a + b) / 2; c.beginPath(); c.moveTo(lx(a), lip(yl, a) + s * 0.03); c.lineTo(lx(b), lip(yl, b) + s * 0.03); c.lineTo(lx(m), lip(yl, m) - s * 0.09); c.closePath(); c.fill(); c.stroke(); }
+  c.restore();
+  mouth(); c.lineWidth = s * 0.07; c.strokeStyle = '#14040a'; c.stroke();
+  if (taunt) {
+    const tw = s * 0.15, ty = s * 0.4, tl = s * 0.34 + Math.sin(t * 10) * s * 0.03;
+    c.beginPath(); c.moveTo(-tw, ty); c.lineTo(-tw, ty + tl * 0.7); c.quadraticCurveTo(-tw, ty + tl + tw * 0.4, 0, ty + tl + tw * 0.4); c.quadraticCurveTo(tw, ty + tl + tw * 0.4, tw, ty + tl * 0.7); c.lineTo(tw, ty); c.closePath();
+    c.fillStyle = '#ff5f8f'; c.fill(); c.lineWidth = s * 0.05; c.strokeStyle = '#14040a'; c.stroke();
+    c.beginPath(); c.moveTo(0, ty + s * 0.05); c.lineTo(0, ty + tl * 0.72); c.lineWidth = s * 0.03; c.strokeStyle = 'rgba(120,0,40,.6)'; c.stroke();
+    return;
+  }
+  const dq = 0.78, dx = lx(dq), dy = lip(yl, dq) - s * 0.02, dl = s * (0.12 + 0.07 * (0.5 + 0.5 * Math.sin(t * 2.2)));
+  c.beginPath(); c.moveTo(dx - s * 0.04, dy); c.quadraticCurveTo(dx - s * 0.055, dy + dl * 0.7, dx, dy + dl); c.quadraticCurveTo(dx + s * 0.055, dy + dl * 0.7, dx + s * 0.04, dy); c.closePath();
+  c.fillStyle = '#a6ff4d'; c.fill(); c.lineWidth = s * 0.03; c.stroke();
+}
+
+const BODY = {
+  mrsa(c, u, t, sd) {
+    const cocci = [[-0.55, -0.38, 0.36], [0.52, -0.42, 0.38], [-0.1, -0.7, 0.3], [0.62, 0.3, 0.34], [-0.6, 0.36, 0.37], [0.12, 0.68, 0.3], [0, 0.02, 0.56]];
+    const P = cocci.map(([x, y, r], i) => () => sePath(c, x * u, y * u, r * u, r * u, 2, sd + i * 1.9, t, 0.05, 4));
+    c.lineJoin = 'round'; c.strokeStyle = '#2b1800'; c.lineWidth = 0.17 * u;
+    for (const p of P) { p(); c.stroke(); }
+    cocci.forEach(([x, y, r], i) => {
+      shade(c, P[i], x * u, y * u, r * u, ['#fff3a6', '#f2b51e', '#8a5200'], u);
+      c.save(); P[i](); c.clip();
+      c.fillStyle = 'rgba(140,170,30,.16)'; c.beginPath(); c.arc(x * u, (y + r * 0.55) * u, r * 0.85 * u, 0, TAU); c.fill();
+      if (i < 6) { c.fillStyle = 'rgba(80,40,0,.38)'; for (let k = 0; k < 3; k++) { const a = sd * 3 + i * 2.3 + k * 2.1; c.beginPath(); c.arc((x + Math.cos(a) * r * 0.5) * u, (y + Math.sin(a) * r * 0.5) * u, r * 0.14 * u, 0, TAU); c.fill(); } }
+      c.restore();
+      P[i](); c.lineWidth = 0.035 * u; c.strokeStyle = 'rgba(43,24,0,.6)'; c.stroke();
+    });
+    return { s: 0.6, y: 0.04 };
+  },
+  efae(c, u, t, sd) {
+    const cocci = [[-0.74, 0.16, 0.42, 0.36], [0.74, -0.16, 0.42, 0.36], [0, 0, 0.6, 0.52]];
+    const P = cocci.map(([x, y, rx, ry], i) => () => sePath(c, x * u, y * u, rx * u, ry * u, 2, sd + i * 2.3, t, 0.04, 4));
+    c.lineJoin = 'round'; c.strokeStyle = '#3a1000'; c.lineWidth = 0.16 * u;
+    for (const p of P) { p(); c.stroke(); }
+    cocci.forEach(([x, y, rx], i) => {
+      shade(c, P[i], x * u, y * u, rx * u, ['#ffc89c', '#ec6a22', '#5a1a00'], u);
+      c.save(); P[i](); c.clip(); c.fillStyle = 'rgba(90,30,0,.35)';
+      for (let k = 0; k < 2; k++) { const a = sd * 2 + i * 1.9 + k * 2.6; c.beginPath(); c.arc((x + Math.cos(a) * rx * 0.5) * u, (y + Math.sin(a) * rx * 0.4) * u, rx * 0.13 * u, 0, TAU); c.fill(); }
+      c.restore();
+      P[i](); c.lineWidth = 0.035 * u; c.strokeStyle = 'rgba(58,16,0,.6)'; c.stroke();
+    });
+    return { s: 0.56, y: 0 };
+  },
+  entb(c, u, t, sd) {
+    c.save(); c.rotate(0.28);
+    for (let i = 0; i < 7; i++) {
+      const bx = (-0.85 + i * 0.28) * u, side = i % 2 ? 1 : -1, ph = t * 6 + i * 1.3 + sd, pts = [];
+      for (let k = 0; k <= 8; k++) pts.push([bx + Math.sin(ph + k * 0.8) * 0.12 * u + k * 0.03 * u * side, side * (0.5 + k * 0.095) * u]);
+      tendril(c, pts, 0.09 * u, 0.02 * u, '#3b1d05');
+    }
+    const P = () => sePath(c, 0, 0, 1.05 * u, 0.58 * u, 2.6, sd, t, 0.035, 6);
+    P(); c.lineWidth = 0.15 * u; c.strokeStyle = '#2a1203'; c.stroke();
+    shade(c, P, 0, 0, 1.0 * u, ['#ffd9a8', '#c7792a', '#3f1c04'], u);
+    c.save(); P(); c.clip(); c.strokeStyle = 'rgba(60,25,0,.4)'; c.lineWidth = 0.08 * u; c.beginPath(); c.moveTo(-0.62 * u, 0.06 * u);
+    for (let k = 1; k <= 8; k++) c.lineTo((-0.62 + k * 0.155) * u, Math.sin(k * 1.7 + sd) * 0.13 * u); c.stroke(); c.restore();
+    blotches(c, P, [[-0.7, -0.25, 0.09], [0.72, 0.22, 0.08], [0.45, -0.3, 0.06]], 'rgba(60,25,0,.4)', u);
+    c.restore();
+    return { s: 0.58, y: 0 };
+  },
+  ecoli(c, u, t, sd) {
+    c.save(); c.rotate(-0.3);
+    for (let i = 0; i < 7; i++) {
+      const bx = (-0.85 + i * 0.28) * u, side = i % 2 ? 1 : -1, ph = t * 6 + i * 1.3 + sd, pts = [];
+      for (let k = 0; k <= 8; k++) pts.push([bx + Math.sin(ph + k * 0.8) * 0.12 * u + k * 0.03 * u * side, side * (0.5 + k * 0.095) * u]);
+      tendril(c, pts, 0.09 * u, 0.02 * u, '#45052a');
+    }
+    const P = () => sePath(c, 0, 0, 1.05 * u, 0.58 * u, 2.6, sd, t, 0.035, 6);
+    c.strokeStyle = 'rgba(69,5,42,.85)'; c.lineWidth = 0.035 * u;
+    for (let i = 0; i < 28; i++) { const a = i / 28 * TAU, ca = Math.cos(a), sa = Math.sin(a), px = Math.sign(ca) * Math.pow(Math.abs(ca), 0.77) * 1.05 * u, py = Math.sign(sa) * Math.pow(Math.abs(sa), 0.77) * 0.58 * u; c.beginPath(); c.moveTo(px, py); c.lineTo(px * 1.12, py * 1.24); c.stroke(); }
+    P(); c.lineWidth = 0.15 * u; c.strokeStyle = '#35031f'; c.stroke();
+    shade(c, P, 0, 0, 1.0 * u, ['#ffa6d4', '#c9256f', '#4a0326'], u);
+    c.save(); P(); c.clip(); c.strokeStyle = 'rgba(70,0,35,.4)'; c.lineWidth = 0.08 * u; c.beginPath(); c.moveTo(-0.62 * u, 0.06 * u);
+    for (let k = 1; k <= 8; k++) c.lineTo((-0.62 + k * 0.155) * u, Math.sin(k * 1.7 + sd) * 0.13 * u); c.stroke(); c.restore();
+    blotches(c, P, [[-0.7, -0.25, 0.09], [0.72, 0.22, 0.08], [0.45, -0.3, 0.06]], 'rgba(70,0,35,.4)', u);
+    c.restore();
+    return { s: 0.58, y: 0 };
+  },
+  gono(c, u, t, sd) {
+    const P = [-1, 1].map(sx => () => sePath(c, sx * 0.48 * u, 0, 0.52 * u, 0.76 * u, 2.2, sd + sx * 2, t, 0.045, 5));
+    c.strokeStyle = 'rgba(3,48,44,.9)'; c.lineWidth = 0.035 * u;
+    for (const sx of [-1, 1]) for (let i = 0; i < 12; i++) {
+      const a = (sx > 0 ? 0 : Math.PI) + (i / 11 - 0.5) * 3.2, px = sx * 0.48 * u + Math.cos(a) * 0.52 * u, py = Math.sin(a) * 0.76 * u;
+      c.beginPath(); c.moveTo(px, py); c.lineTo(sx * 0.48 * u + Math.cos(a) * 0.72 * u, Math.sin(a) * 0.98 * u); c.stroke();
+    }
+    c.lineJoin = 'round'; c.strokeStyle = '#03302c'; c.lineWidth = 0.15 * u;
+    for (const p of P) { p(); c.stroke(); }
+    [-1, 1].forEach((sx, i) => { shade(c, P[i], sx * 0.48 * u, 0, 0.74 * u, ['#93f7ec', '#12988e', '#043a36'], u); blotches(c, P[i], [[sx * 0.7, -0.45, 0.08], [sx * 0.62, 0.5, 0.1]], 'rgba(0,40,36,.4)', u); });
+    c.beginPath(); c.moveTo(0, -0.62 * u); c.quadraticCurveTo(0.06 * u, 0, 0, 0.62 * u); c.lineWidth = 0.05 * u; c.strokeStyle = 'rgba(3,48,44,.7)'; c.stroke();
+    return { s: 0.8, y: 0 };
+  },
+  pseudo(c, u, t, sd) {
+    c.save(); c.rotate(0.22);
+    const pts = []; for (let k = 0; k <= 12; k++) pts.push([(0.78 + k * 0.05) * u, Math.sin(t * 8 + k * 0.9 + sd) * 0.05 * u * k * 0.35]);
+    tendril(c, pts, 0.1 * u, 0.025 * u, '#022b27');
+    const P = () => sePath(c, -0.12 * u, 0, 0.92 * u, 0.58 * u, 2.5, sd, t, 0.04, 5);
+    P(); c.lineWidth = 0.15 * u; c.strokeStyle = '#022b27'; c.stroke();
+    shade(c, P, -0.12 * u, 0, 0.95 * u, ['#a6ffe8', '#0f9c86', '#033833'], u);
+    blotches(c, P, [[-0.75, -0.2, 0.1], [0.45, 0.25, 0.08], [-0.3, 0.38, 0.07], [0.5, -0.32, 0.06]], 'rgba(0,40,30,.38)', u);
+    c.fillStyle = '#7dffc8'; c.strokeStyle = '#022b27'; c.lineWidth = 0.04 * u;
+    for (const [dx, len] of [[-0.5, 0.24], [0.22, 0.17]]) {
+      const L = len * u * (0.8 + 0.3 * Math.sin(t * 2 + dx * 5));
+      c.beginPath(); c.moveTo((dx - 0.07) * u, 0.5 * u); c.quadraticCurveTo((dx - 0.08) * u, 0.5 * u + L * 0.8, dx * u, 0.5 * u + L); c.quadraticCurveTo((dx + 0.08) * u, 0.5 * u + L * 0.8, (dx + 0.07) * u, 0.5 * u); c.closePath(); c.fill(); c.stroke();
+    }
+    c.restore();
+    return { s: 0.56, y: 0 };
+  },
+  tb(c, u, t, sd) {
+    c.save(); c.rotate(-0.55);
+    const coat = () => sePath(c, 0, 0, 1.26 * u, 0.5 * u, 2.4, sd, t, 0.05, 7);
+    coat(); c.fillStyle = 'rgba(255,230,200,.35)'; c.fill(); c.lineWidth = 0.05 * u; c.strokeStyle = 'rgba(255,240,220,.75)'; c.stroke();
+    const P = () => sePath(c, 0, 0, 1.12 * u, 0.36 * u, 2.6, sd + 1, t, 0.03, 6);
+    P(); c.lineWidth = 0.14 * u; c.strokeStyle = '#30020e'; c.stroke();
+    shade(c, P, 0, 0, 0.9 * u, ['#ff9fb4', '#c0143b', '#42030e'], u);
+    c.save(); P(); c.clip(); c.strokeStyle = 'rgba(60,0,15,.45)'; c.lineWidth = 0.05 * u;
+    for (const x of [-0.78, -0.45, 0.45, 0.78]) { c.beginPath(); c.moveTo(x * u, -0.4 * u); c.quadraticCurveTo((x + 0.06) * u, 0, x * u, 0.4 * u); c.stroke(); }
+    c.restore();
+    c.restore();
+    return { s: 0.5, y: 0 };
+  },
+  crab(c, u, t, sd) {
+    c.fillStyle = '#1d1040';
+    for (let i = 0; i < 14; i++) {
+      const a = i / 14 * TAU + sd * 0.1, ca = Math.cos(a), sa = Math.sin(a);
+      c.beginPath(); c.moveTo(ca * 0.82 * u - sa * 0.1 * u, sa * 0.68 * u + ca * 0.1 * u); c.lineTo(ca * 1.16 * u, sa * 0.98 * u); c.lineTo(ca * 0.82 * u + sa * 0.1 * u, sa * 0.68 * u - ca * 0.1 * u); c.closePath(); c.fill();
+    }
+    const P = () => sePath(c, 0, 0, 0.95 * u, 0.8 * u, 2.1, sd, t, 0.05, 5);
+    P(); c.lineWidth = 0.15 * u; c.strokeStyle = '#1d1040'; c.stroke();
+    shade(c, P, 0, 0, 0.95 * u, ['#ddd0ff', '#6a50c2', '#1d1046'], u);
+    c.save(); P(); c.clip(); c.strokeStyle = 'rgba(25,12,60,.5)'; c.lineWidth = 0.05 * u; c.fillStyle = 'rgba(25,12,60,.2)';
+    for (const [x, y, r] of [[-0.58, -0.38, 0.28], [0.6, -0.32, 0.26], [-0.52, 0.48, 0.25], [0.56, 0.48, 0.27]]) { c.beginPath(); for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; c.lineTo((x + Math.cos(a) * r) * u, (y + Math.sin(a) * r) * u); } c.closePath(); c.fill(); c.stroke(); }
+    c.restore();
+    return { s: 0.62, y: 0.02 };
+  },
+  kleb(c, u, t, sd) {
+    c.fillStyle = '#2a0410';
+    for (let i = 0; i < 9; i++) {
+      const a = -Math.PI + 0.3 + i / 8 * (Math.PI - 0.6), ca = Math.cos(a), sa = Math.sin(a);
+      const bx = ca * 0.98 * u, by = sa * 0.64 * u, tx = ca * 1.3 * u, ty = sa * 1.02 * u, px = -sa * 0.09 * u, py = ca * 0.09 * u;
+      c.beginPath(); c.moveTo(bx - px, by - py); c.quadraticCurveTo(tx * 0.88 + px, ty * 0.88 + py, tx, ty); c.lineTo(bx + px, by + py); c.closePath(); c.fill();
+    }
+    const P = () => sePath(c, 0, 0, 1.1 * u, 0.74 * u, 2.5, sd, t, 0.04, 5);
+    P(); c.lineWidth = 0.15 * u; c.strokeStyle = '#2a0410'; c.stroke();
+    shade(c, P, 0, 0, 1.05 * u, ['#ffb3c7', '#cf1f4c', '#45051a'], u);
+    c.save(); P(); c.clip(); c.strokeStyle = 'rgba(70,0,20,.45)'; c.lineWidth = 0.05 * u; c.lineCap = 'round';
+    for (const [x0, y0, a0] of [[-0.95, 0.1, -0.3], [0.95, -0.05, Math.PI + 0.25], [-0.2, 0.7, -1.4]]) {
+      let x = x0, y = y0, a = a0; c.beginPath(); c.moveTo(x * u, y * u);
+      for (let k = 0; k < 5; k++) { a += Math.sin(sd + k * 1.7) * 0.5; x += Math.cos(a) * 0.16; y += Math.sin(a) * 0.16; c.lineTo(x * u, y * u); }
+      c.stroke();
+    }
+    c.restore();
+    blotches(c, P, [[-0.6, -0.35, 0.09], [0.62, 0.32, 0.1], [0.3, -0.45, 0.06]], 'rgba(70,0,20,.4)', u);
+    return { s: 0.64, y: 0.04 };
+  }
+};
+
+function gooPuddle(c, x, y, s, seed, t) {
+  const R0 = s * 0.58, oy = s * 0.08;
+  c.save(); c.translate(x, y);
+  c.beginPath();
+  for (let i = 0; i <= 24; i++) {
+    const a = i / 24 * TAU, w = 1 + 0.15 * Math.sin(a * 3 + seed) + 0.09 * Math.sin(a * 5 - seed * 1.7 + t * 0.8) + 0.06 * Math.sin(a * 9 + seed * 3);
+    const px = Math.cos(a) * R0 * w, py = Math.sin(a) * R0 * w * 0.9 + oy;
+    if (i) c.lineTo(px, py); else c.moveTo(px, py);
+  }
+  c.closePath();
+  const gr = c.createRadialGradient(0, oy, s * 0.05, 0, oy, R0 * 1.15);
+  gr.addColorStop(0, 'rgba(190,255,70,.85)'); gr.addColorStop(0.55, 'rgba(120,210,20,.7)'); gr.addColorStop(1, 'rgba(55,120,0,.45)');
+  c.fillStyle = gr; c.fill(); c.lineWidth = s * 0.035; c.strokeStyle = 'rgba(30,70,0,.8)'; c.stroke();
+  c.fillStyle = 'rgba(160,245,45,.8)';
+  for (let j = 0; j < 5; j++) { const a = seed * 2 + j * 1.3, d = R0 * (1.1 + 0.14 * Math.sin(seed + j)); c.beginPath(); c.arc(Math.cos(a) * d, Math.sin(a) * d * 0.9 + oy, s * (0.03 + 0.018 * (j % 2)), 0, TAU); c.fill(); }
+  c.fillStyle = 'rgba(245,255,205,.5)'; c.beginPath(); c.ellipse(-R0 * 0.38, -R0 * 0.22 + oy, R0 * 0.22, R0 * 0.07, -0.4, 0, TAU); c.fill();
+  c.restore();
+}
+function gunge(c, u, t, sd) {
+  c.save(); c.lineCap = 'round';
+  c.fillStyle = 'rgba(170,255,60,.28)';
+  for (let j = 0; j < 3; j++) { const a = sd * 1.7 + j * 2.2; c.beginPath(); c.ellipse(Math.cos(a) * 0.42 * u, Math.sin(a) * 0.3 * u - 0.05 * u, (0.22 + 0.06 * j) * u, 0.12 * u, a, 0, TAU); c.fill(); }
+  for (let j = 0; j < 3; j++) {
+    const ph = (((t * 0.55 + j * 0.37 + sd * 0.13) % 1) + 1) % 1;
+    const bx = (-0.5 + j * 0.5 + Math.sin(sd * 3 + j) * 0.1) * u, by = (0.15 + Math.cos(sd + j * 2) * 0.22) * u;
+    if (ph < 0.85) { const r = 0.13 * u * (ph / 0.85); c.beginPath(); c.arc(bx, by, r, 0, TAU); c.fillStyle = 'rgba(200,255,110,.5)'; c.fill(); c.lineWidth = 0.025 * u; c.strokeStyle = 'rgba(245,255,215,.95)'; c.stroke(); }
+    else { const k = (ph - 0.85) / 0.15; c.strokeStyle = `rgba(220,255,150,${1 - k})`; c.lineWidth = 0.025 * u; for (let m = 0; m < 5; m++) { const a = m / 5 * TAU; c.beginPath(); c.moveTo(bx + Math.cos(a) * 0.08 * u, by + Math.sin(a) * 0.08 * u); c.lineTo(bx + Math.cos(a) * (0.1 + 0.08 * k) * u, by + Math.sin(a) * (0.1 + 0.08 * k) * u); c.stroke(); } }
+  }
+  for (let j = 0; j < 4; j++) {
+    const x = (-0.56 + j * 0.37 + Math.sin(sd + j) * 0.06) * u, top = (0.48 + 0.08 * Math.cos(sd * 2 + j)) * u;
+    const len = (0.18 + 0.22 * ((Math.sin(t * 1.4 + sd + j * 2.1) + 1) / 2)) * u * (j % 2 ? 1 : 1.25), w = 0.085 * u;
+    c.strokeStyle = '#2c5606'; c.lineWidth = w * 1.9; c.beginPath(); c.moveTo(x, top); c.lineTo(x, top + len); c.stroke();
+    c.beginPath(); c.arc(x, top + len, w * 1.3, 0, TAU); c.fillStyle = '#2c5606'; c.fill();
+    c.strokeStyle = '#9cf22e'; c.lineWidth = w * 1.2; c.beginPath(); c.moveTo(x, top); c.lineTo(x, top + len); c.stroke();
+    c.beginPath(); c.arc(x, top + len, w, 0, TAU); c.fillStyle = '#a8ff38'; c.fill();
+    c.beginPath(); c.arc(x - w * 0.35, top + len - w * 0.35, w * 0.3, 0, TAU); c.fillStyle = 'rgba(255,255,255,.75)'; c.fill();
+  }
+  c.restore();
+}
+function stink(c, u, t, sd) {
+  c.save(); c.lineCap = 'round'; c.lineWidth = 0.065 * u; c.strokeStyle = '#c4ff5a';
+  for (let j = 0; j < 3; j++) {
+    const ph = (((t * 0.45 + j / 3 + sd * 0.05) % 1) + 1) % 1, x0 = [-1, 1, -0.55][j] * 0.98 * u, y0 = (-0.7 - ph * 0.6) * u;
+    c.globalAlpha = Math.sin(ph * Math.PI) * 0.85;
+    c.beginPath();
+    for (let k = 0; k <= 6; k++) { const yy = y0 - k * 0.07 * u, xx = x0 + Math.sin(k * 1.3 + t * 4 + j) * 0.07 * u; if (k) c.lineTo(xx, yy); else c.moveTo(xx, yy); }
+    c.stroke();
+  }
+  c.restore();
+}
+function thirdEye(c, s, blink) {
+  const y = -s * 0.58, w = s * 0.17, h = blink ? s * 0.02 : s * 0.11;
+  c.beginPath(); c.moveTo(-w, y); c.quadraticCurveTo(0, y - h * 1.6, w, y); c.quadraticCurveTo(0, y + h * 1.6, -w, y); c.closePath();
+  c.fillStyle = '#f2cf1a'; c.fill();
+  if (!blink) { c.beginPath(); c.ellipse(0, y, s * 0.03, h * 0.9, 0, 0, TAU); c.fillStyle = '#120205'; c.fill(); }
+  c.lineWidth = s * 0.05; c.strokeStyle = '#14040a'; c.stroke();
+}
+function drawBug(c, b, cx, cy, s, t, ncol) {
+  const u = s * 0.36;
+  c.save(); c.translate(cx, cy);
+  if (b.wob > 0) c.rotate(Math.sin(t * 40) * (b.boss ? 0.06 : 0.18) * (b.wob / 0.4));
+  const tt = RM ? 0 : t, pul = 0.8 + 0.2 * Math.sin(tt * 2.5 + b.phase);
+  const au = c.createRadialGradient(0, 0, 0.3 * u, 0, 0, 1.38 * u);
+  au.addColorStop(0, `rgba(185,255,50,${(b.boss ? 0.55 : 0.45) * pul})`); au.addColorStop(0.6, `rgba(120,230,30,${0.18 * pul})`); au.addColorStop(1, 'rgba(120,230,30,0)');
+  c.fillStyle = au; c.beginPath(); c.arc(0, 0, 1.38 * u, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(0, 0.98 * u, 0.85 * u, 0.17 * u, 0, 0, TAU); c.fillStyle = 'rgba(12,0,30,.35)'; c.fill();
+  const caps = b.boss ? (b.capsule || 0) : (b.sp === 'kleb' ? 1 : 0);
+  for (let k = caps - 1; k >= 0; k--) {
+    sePath(c, 0, 0, (1.2 + k * 0.1) * u, (0.92 + k * 0.1) * u, 2.2, b.phase + k, tt, 0.05, 4);
+    c.fillStyle = b.boss ? 'rgba(255,215,232,.22)' : 'rgba(255,215,232,.12)'; c.fill();
+    c.lineWidth = 0.05 * u; c.strokeStyle = 'rgba(255,235,245,.75)'; c.stroke();
+  }
+  const br = 1 + Math.sin(tt * 3 + b.phase) * (b.boss ? 0.02 : 0.035);
+  c.save(); c.scale(br, 1 / br);
+  const f = BODY[b.sp](c, u, tt, b.phase);
+  gunge(c, u, tt, b.phase);
+  const mood = b.flash > 0 ? 'hurt' : 'grin', blink = b.blink < 0;
+  c.save(); c.translate(0, f.y * u); face(c, f.s * u, mood, blink, tt, b.tauntT < 0 && mood !== 'hurt');
+  if (b.boss && mood !== 'hurt') thirdEye(c, f.s * u, blink);
+  c.restore();
+  c.restore();
+  stink(c, u, tt, b.phase);
+  if (b.slime) {
+    c.beginPath();
+    for (let i = 0; i <= 18; i++) { const a = i / 18 * TAU, rr = 1.24 * u * (1 + 0.05 * Math.sin(a * 3 + tt * 2)); const px = Math.cos(a) * rr, py = Math.sin(a) * rr * 0.95; if (i) c.lineTo(px, py); else c.moveTo(px, py); }
+    c.closePath(); c.fillStyle = 'rgba(130,235,175,.33)'; c.fill(); c.lineWidth = 0.07 * u; c.strokeStyle = 'rgba(205,255,225,.85)'; c.stroke();
+    c.lineWidth = 0.04 * u; for (const [x, y, r] of [[-0.85, -0.55, 0.12], [0.9, 0.35, 0.1], [-0.6, 0.85, 0.08]]) { c.beginPath(); c.arc(x * u, y * u, r * u, 0, TAU); c.stroke(); }
+  }
+  if (b.clank > 0) { c.save(); c.globalAlpha = Math.min(1, b.clank * 3); shieldPath(c, 0, 0, 1.0 * u); c.fillStyle = 'rgba(225,220,245,.3)'; c.fill(); c.lineWidth = 0.12 * u; c.strokeStyle = '#fff'; c.stroke(); c.restore(); }
+  if (b.mutFlash > 0 && b.mutColor != null) { const k = Math.max(0, 1 - b.mutFlash / 0.8); c.save(); c.globalAlpha = 1 - k; c.beginPath(); c.arc(0, 0, (0.8 + k * 0.9) * u, 0, TAU); c.strokeStyle = DRUGS[b.mutColor].base; c.lineWidth = 0.18 * u; c.stroke(); c.restore(); }
+  if (!b.noHud) {
+    const res = [...b.res].filter(i => i < ncol).sort((a, z) => a - z);
+    if (ncol && res.length >= ncol) { c.beginPath(); c.arc(0, 0, 1.3 * u, 0, TAU); c.setLineDash([0.2 * u, 0.14 * u]); c.strokeStyle = '#ff5c8a'; c.lineWidth = 0.1 * u; c.stroke(); c.setLineDash([]); }
+    if (b.boss) {
+      const bw = 2.0 * u, bh = 0.17 * u, by = 1.1 * u, fr = Math.max(0, b.hp / b.maxHp);
+      rrp(c, -bw / 2, by, bw, bh, bh / 2); c.fillStyle = 'rgba(20,0,40,.65)'; c.fill();
+      if (fr > 0) { rrp(c, -bw / 2, by, bw * fr, bh, bh / 2); const hg = c.createLinearGradient(-bw / 2, 0, bw / 2, 0); hg.addColorStop(0, '#ff3b5c'); hg.addColorStop(1, '#ffcf4a'); c.fillStyle = hg; c.fill(); }
+      rrp(c, -bw / 2, by, bw, bh, bh / 2); c.lineWidth = 0.04 * u; c.strokeStyle = '#fff'; c.stroke();
+      if (b.spawnIn != null) {
+        const sx = 1.12 * u, sy = 0.6 * u, rr = 0.2 * u;
+        c.beginPath(); c.arc(sx, sy, rr, 0, TAU); c.fillStyle = '#2a1150'; c.fill(); c.lineWidth = 0.05 * u; c.strokeStyle = '#ff5c8a'; c.stroke();
+        c.fillStyle = '#fff'; c.font = `${Math.round(rr * 1.3)}px ${DF}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(b.spawnIn), sx, sy + rr * 0.06); c.textBaseline = 'alphabetic';
+      }
+    } else if (b.maxHp > 1) {
+      const pw = 0.32 * u, gap = 0.08 * u, tw = b.maxHp * pw + (b.maxHp - 1) * gap;
+      for (let i = 0; i < b.maxHp; i++) { rrp(c, -tw / 2 + i * (pw + gap), 1.1 * u, pw, 0.18 * u, 0.08 * u); c.fillStyle = i < b.hp ? '#ffffff' : 'rgba(20,0,40,.5)'; c.fill(); c.lineWidth = 0.05 * u; c.strokeStyle = '#1a0833'; c.stroke(); }
+    }
+    if (res.length) {
+      const bs = res.length > 4 ? 0.26 * u : 0.32 * u, step = bs * 1.9, tw = (res.length - 1) * step;
+      for (let i = 0; i < res.length; i++) {
+        const bx = -tw / 2 + i * step, by = -1.1 * u;
+        shieldPath(c, bx, by, bs); c.fillStyle = DRUGS[res[i]].base; c.fill(); c.lineWidth = 0.1 * u; c.strokeStyle = '#1a0833'; c.stroke(); c.lineWidth = 0.04 * u; c.strokeStyle = '#fff'; c.stroke();
+      }
+    }
+  }
+  c.restore();
+}
+const iconCache = {};
+function icon(key, size, fn) {
+  if (iconCache[key]) return iconCache[key];
+  const cv = document.createElement('canvas'); cv.width = cv.height = size * 2; const c = cv.getContext('2d'); c.scale(2, 2); fn(c);
+  return (iconCache[key] = cv.toDataURL());
+}
+const drugIcon = i => icon('d' + i, 64, c => drawPill(c, i, 32, 32, 60, null, 0));
+const shieldIcon = i => icon('s' + i, 32, c => { shieldPath(c, 16, 16, 12); c.fillStyle = DRUGS[i].base; c.fill(); c.lineWidth = 2.5; c.strokeStyle = '#1a0833'; c.stroke(); c.lineWidth = 1; c.strokeStyle = '#fff'; c.stroke(); });
+const fakeBug = sp => ({ sp, hp: 1, maxHp: 1, res: new Set(), slime: false, phase: 0, blink: 1, flash: 0, wob: 0, clank: 0, mutFlash: 0 });
+const portrait = sp => icon('p' + sp, 120, c => drawBug(c, fakeBug(sp), 60, 64, 96, 0, 0));
+
+/* ---------------- New characters ---------------- */
+function drawGood(c, s, t, sad, blink) {
+  const u = s * 0.36, tt = RM ? 0 : t;
+  const au = c.createRadialGradient(0, 0, 0.3 * u, 0, 0, 1.4 * u);
+  au.addColorStop(0, 'rgba(150,225,255,.42)'); au.addColorStop(1, 'rgba(150,225,255,0)');
+  c.fillStyle = au; c.beginPath(); c.arc(0, 0, 1.4 * u, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(0, 0.92 * u, 0.85 * u, 0.16 * u, 0, 0, TAU); c.fillStyle = 'rgba(12,0,30,.3)'; c.fill();
+  c.save(); c.rotate(-0.08);
+  const P = () => sePath(c, 0, 0.08 * u, 1.02 * u, 0.58 * u, 2.7, 1, tt, 0.025, 4);
+  P(); c.lineWidth = 0.15 * u; c.strokeStyle = '#0b3a5c'; c.stroke();
+  shade(c, P, 0, 0.08 * u, 1.0 * u, ['#e6f8ff', '#5ab8ef', '#175a8f'], u);
+  blotches(c, P, [[-0.72, 0.3, 0.08], [0.74, -0.12, 0.07], [0.5, 0.42, 0.06]], 'rgba(10,60,110,.25)', u);
+  c.restore();
+  const ex = 0.34 * u, ey = -0.02 * u;
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  if (sad) {
+    c.strokeStyle = '#0b2a44'; c.lineWidth = 0.08 * u;
+    for (const sx of [-1, 1]) { c.beginPath(); c.arc(sx * ex, ey + 0.08 * u, 0.12 * u, Math.PI * 1.15, Math.PI * 1.85); c.stroke(); }
+    c.beginPath(); c.moveTo(ex + 0.02 * u, ey + 0.12 * u); c.quadraticCurveTo(ex + 0.14 * u, ey + 0.34 * u, ex + 0.04 * u, ey + 0.38 * u); c.quadraticCurveTo(ex - 0.06 * u, ey + 0.32 * u, ex + 0.02 * u, ey + 0.12 * u);
+    c.fillStyle = '#bfeaff'; c.fill(); c.lineWidth = 0.03 * u; c.stroke();
+    c.lineWidth = 0.08 * u; c.beginPath(); c.arc(0, 0.46 * u, 0.16 * u, Math.PI * 1.2, Math.PI * 1.8); c.stroke();
+  } else {
+    for (const sx of [-1, 1]) {
+      const x = sx * ex;
+      if (blink) { c.beginPath(); c.moveTo(x - 0.12 * u, ey); c.lineTo(x + 0.12 * u, ey); c.lineWidth = 0.07 * u; c.strokeStyle = '#0b2a44'; c.stroke(); continue; }
+      c.beginPath(); c.arc(x, ey, 0.16 * u, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 0.05 * u; c.strokeStyle = '#0b2a44'; c.stroke();
+      c.beginPath(); c.arc(x + 0.03 * u, ey + 0.03 * u, 0.09 * u, 0, TAU); c.fillStyle = '#0b2a44'; c.fill();
+      c.beginPath(); c.arc(x - 0.01 * u, ey - 0.02 * u, 0.035 * u, 0, TAU); c.fillStyle = '#fff'; c.fill();
+    }
+    c.fillStyle = 'rgba(255,120,160,.6)';
+    for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(sx * 0.62 * u, 0.2 * u, 0.12 * u, 0.07 * u, 0, 0, TAU); c.fill(); }
+    c.beginPath(); c.arc(0, 0.16 * u, 0.2 * u, 0.15 * Math.PI, 0.85 * Math.PI); c.lineWidth = 0.08 * u; c.strokeStyle = '#0b2a44'; c.stroke();
+  }
+  const hy = -0.82 * u + (RM ? 0 : Math.sin(tt * 3) * 0.04 * u);
+  c.beginPath(); c.ellipse(0, hy, 0.42 * u, 0.11 * u, 0, 0, TAU); c.lineWidth = 0.1 * u; c.strokeStyle = sad ? 'rgba(255,226,122,.45)' : '#ffe27a'; c.stroke();
+  c.lineWidth = 0.03 * u; c.strokeStyle = '#fff8d6'; c.stroke();
+}
+function drawVirus(c, s, t, smug, blink) {
+  const u = s * 0.36, tt = RM ? 0 : t, R0 = 0.72 * u;
+  const au = c.createRadialGradient(0, 0, 0.3 * u, 0, 0, 1.4 * u);
+  au.addColorStop(0, 'rgba(170,185,255,.35)'); au.addColorStop(1, 'rgba(170,185,255,0)');
+  c.fillStyle = au; c.beginPath(); c.arc(0, 0, 1.4 * u, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(0, 0.98 * u, 0.7 * u, 0.15 * u, 0, 0, TAU); c.fillStyle = 'rgba(12,0,30,.3)'; c.fill();
+  c.save(); c.rotate(tt * 0.35); c.lineCap = 'round';
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * TAU, ca = Math.cos(a), sa = Math.sin(a);
+    c.beginPath(); c.moveTo(ca * R0 * 0.85, sa * R0 * 0.85); c.lineTo(ca * 0.98 * u, sa * 0.98 * u); c.lineWidth = 0.09 * u; c.strokeStyle = '#2b2466'; c.stroke();
+    c.beginPath(); c.arc(ca * 1.04 * u, sa * 1.04 * u, 0.12 * u, 0, TAU); c.fillStyle = '#ffb36b'; c.fill(); c.lineWidth = 0.05 * u; c.strokeStyle = '#6a3300'; c.stroke();
+  }
+  c.restore();
+  const P = () => sePath(c, 0, 0, R0, R0, 2, 0.7, tt, 0.025, 5);
+  P(); c.lineWidth = 0.13 * u; c.strokeStyle = '#25205c'; c.stroke();
+  shade(c, P, 0, 0, R0, ['#eef0ff', '#8e9ff0', '#2c368c'], u);
+  const ex = 0.27 * u, ey = -0.12 * u, ew = 0.14 * u, lid = blink ? 1 : 0.55;
+  for (const sx of [-1, 1]) {
+    const x = sx * ex;
+    c.beginPath(); c.ellipse(x, ey, ew, ew * 0.95, 0, 0, TAU); c.fillStyle = '#fff'; c.fill();
+    c.beginPath(); c.arc(x + sx * 0.02 * u, ey + 0.05 * u, 0.065 * u, 0, TAU); c.fillStyle = '#1a1440'; c.fill();
+    c.save(); c.beginPath(); c.ellipse(x, ey, ew, ew * 0.95, 0, 0, TAU); c.clip(); c.fillStyle = '#7685dc'; c.fillRect(x - ew, ey - ew, ew * 2, ew * 2 * lid); c.restore();
+    c.beginPath(); c.ellipse(x, ey, ew, ew * 0.95, 0, 0, TAU); c.lineWidth = 0.05 * u; c.strokeStyle = '#1a1440'; c.stroke();
+    c.beginPath(); c.moveTo(x - ew * 0.95, ey - ew + ew * 2 * lid); c.lineTo(x + ew * 0.95, ey - ew + ew * 2 * lid); c.lineWidth = 0.06 * u; c.stroke();
+  }
+  const dl = 0.1 * u + (RM ? 0 : (0.5 + 0.5 * Math.sin(tt * 2.2)) * 0.1 * u), nx = 0.12 * u;
+  c.beginPath(); c.moveTo(nx - 0.035 * u, 0.06 * u); c.quadraticCurveTo(nx - 0.06 * u, 0.06 * u + dl * 0.8, nx, 0.06 * u + dl + 0.05 * u); c.quadraticCurveTo(nx + 0.06 * u, 0.06 * u + dl * 0.8, nx + 0.035 * u, 0.06 * u); c.closePath();
+  c.fillStyle = '#c8f0ff'; c.fill(); c.lineWidth = 0.03 * u; c.strokeStyle = '#1a1440'; c.stroke();
+  c.lineWidth = 0.07 * u; c.lineCap = 'round'; c.strokeStyle = '#1a1440'; c.beginPath();
+  if (smug) { c.moveTo(-0.22 * u, 0.33 * u); c.quadraticCurveTo(0.02 * u, 0.44 * u, 0.24 * u, 0.24 * u); }
+  else { c.moveTo(-0.2 * u, 0.4 * u); c.quadraticCurveTo(-0.07 * u, 0.32 * u, 0, 0.37 * u); c.quadraticCurveTo(0.08 * u, 0.42 * u, 0.2 * u, 0.36 * u); }
+  c.stroke();
+}
+function drawSoap(c, s, t) {
+  const u = s * 0.36, tt = RM ? 0 : t;
+  const au = c.createRadialGradient(0, 0, 0.3 * u, 0, 0, 1.4 * u);
+  au.addColorStop(0, 'rgba(255,190,220,.45)'); au.addColorStop(1, 'rgba(255,190,220,0)');
+  c.fillStyle = au; c.beginPath(); c.arc(0, 0, 1.4 * u, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(0, 0.82 * u, 0.9 * u, 0.15 * u, 0, 0, TAU); c.fillStyle = 'rgba(12,0,30,.3)'; c.fill();
+  for (let j = 0; j < 5; j++) {
+    const ph = (((tt * 0.45 + j * 0.21) % 1) + 1) % 1, bx = (-0.62 + j * 0.31) * u + Math.sin(tt * 2 + j) * 0.06 * u, by = (-0.4 - ph * 0.75) * u, br = (0.07 + 0.05 * (j % 3)) * u * (0.7 + ph * 0.5);
+    c.globalAlpha = RM ? 0.8 : Math.sin(ph * Math.PI) * 0.95;
+    c.beginPath(); c.arc(bx, by, br, 0, TAU); c.fillStyle = 'rgba(255,255,255,.2)'; c.fill(); c.lineWidth = 0.03 * u; c.strokeStyle = 'rgba(255,255,255,.95)'; c.stroke();
+    c.beginPath(); c.arc(bx - br * 0.35, by - br * 0.35, br * 0.22, 0, TAU); c.fillStyle = '#fff'; c.fill();
+  }
+  c.globalAlpha = 1;
+  c.save(); c.rotate(-0.14); c.lineJoin = 'round';
+  rrp(c, -0.9 * u, -0.28 * u, 1.8 * u, 0.86 * u, 0.3 * u); c.fillStyle = '#b8336a'; c.fill(); c.lineWidth = 0.1 * u; c.strokeStyle = '#5e1233'; c.stroke();
+  rrp(c, -0.9 * u, -0.46 * u, 1.8 * u, 0.82 * u, 0.3 * u);
+  const gr = c.createLinearGradient(0, -0.46 * u, 0, 0.36 * u); gr.addColorStop(0, '#ffe3ee'); gr.addColorStop(1, '#ff86b0');
+  c.fillStyle = gr; c.fill(); c.stroke();
+  c.font = `${Math.max(6, Math.round(0.4 * u))}px ${DF}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillStyle = 'rgba(255,255,255,.75)'; c.fillText('SOAP', 0.02 * u, -0.02 * u);
+  c.fillStyle = 'rgba(140,30,80,.5)'; c.fillText('SOAP', 0, -0.05 * u);
+  c.beginPath(); c.ellipse(-0.5 * u, -0.32 * u, 0.22 * u, 0.06 * u, -0.1, 0, TAU); c.fillStyle = 'rgba(255,255,255,.7)'; c.fill();
+  c.restore(); c.textBaseline = 'alphabetic';
+  c.fillStyle = '#fff';
+  for (const [x, y, r] of [[0.5, -0.56, 0.13], [0.66, -0.5, 0.1], [0.38, -0.5, 0.09], [0.58, -0.66, 0.08]]) { c.beginPath(); c.arc(x * u, y * u, r * u, 0, TAU); c.fill(); }
+}
+function drawAntiviral(c, cx, cy, s, t) {
+  const u = s * 0.36, d = DRUGS[AV];
+  c.save(); c.translate(cx, cy); c.rotate(PILL_ROT[AV]); c.lineJoin = 'round';
+  const build = () => { c.beginPath(); rrSub(c, -1.15 * u, -0.56 * u, 2.3 * u, 1.12 * u, 0.56 * u); };
+  c.save(); c.translate(0.05 * u, 0.12 * u); build(); c.fillStyle = 'rgba(16,0,36,.35)'; c.fill(); c.restore();
+  build(); const gr = c.createLinearGradient(0, -u, 0, u); gr.addColorStop(0, d.light); gr.addColorStop(0.45, d.base); gr.addColorStop(1, d.dark); c.fillStyle = gr; c.fill();
+  c.save(); build(); c.clip();
+  const wg = c.createLinearGradient(0, -u, 0, u); wg.addColorStop(0, '#ffffff'); wg.addColorStop(0.5, '#effcfd'); wg.addColorStop(1, '#bfd9dd');
+  c.fillStyle = wg; c.fillRect(0, -u, 1.3 * u, 2 * u); c.fillStyle = 'rgba(0,0,0,.14)'; c.fillRect(-0.04 * u, -u, 0.08 * u, 2 * u); c.restore();
+  c.save(); c.translate(0.58 * u, 0); c.rotate(-PILL_ROT[AV]); c.strokeStyle = d.line; c.lineWidth = 0.06 * u; c.lineCap = 'round';
+  for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; c.beginPath(); c.moveTo(Math.cos(a) * 0.18 * u, Math.sin(a) * 0.18 * u); c.lineTo(Math.cos(a) * 0.3 * u, Math.sin(a) * 0.3 * u); c.stroke(); }
+  c.beginPath(); c.arc(0, 0, 0.2 * u, 0, TAU); c.fillStyle = d.base; c.fill(); c.stroke();
+  c.restore();
+  build(); c.lineWidth = 0.1 * u; c.strokeStyle = d.line; c.stroke();
+  c.save(); build(); c.clip(); c.beginPath(); c.ellipse(-0.34 * u, -0.4 * u, 0.46 * u, 0.2 * u, -0.45, 0, TAU); c.fillStyle = 'rgba(255,255,255,.6)'; c.fill(); c.restore();
+  c.restore();
+}
+const drawDrug = (c, d, x, y, s, t) => d === AV ? drawAntiviral(c, x, y, s, t) : drawPill(c, d, x, y, s, null, t);
+const trayIcon = d => d === AV ? icon('dav', 64, c => drawAntiviral(c, 32, 32, 60, 0)) : drugIcon(d);
+function twinkle(c, x, y, u, t) {
+  const tw = RM ? 1 : 0.6 + Math.abs(Math.sin(t * 5)) * 0.6;
+  c.save(); c.translate(x, y); c.scale(tw, tw); c.fillStyle = '#fff'; c.beginPath();
+  c.moveTo(0, -0.2 * u); c.lineTo(0.05 * u, -0.05 * u); c.lineTo(0.2 * u, 0); c.lineTo(0.05 * u, 0.05 * u); c.lineTo(0, 0.2 * u); c.lineTo(-0.05 * u, 0.05 * u); c.lineTo(-0.2 * u, 0); c.lineTo(-0.05 * u, -0.05 * u); c.closePath(); c.fill(); c.restore();
+}
+function drawCold(c, s, t, smug, blink) {
+  const u = s * 0.36, tt = RM ? 0 : t, R0 = 0.74 * u;
+  const au = c.createRadialGradient(0, 0, 0.3 * u, 0, 0, 1.35 * u); au.addColorStop(0, 'rgba(230,220,250,.35)'); au.addColorStop(1, 'rgba(230,220,250,0)');
+  c.fillStyle = au; c.beginPath(); c.arc(0, 0, 1.35 * u, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(0, 0.92 * u, 0.75 * u, 0.15 * u, 0, 0, TAU); c.fillStyle = 'rgba(12,0,30,.3)'; c.fill();
+  c.save(); c.translate(0, RM ? 0 : Math.sin(tt * 2.4) * 0.03 * u); c.lineJoin = 'round';
+  const hex = () => { c.beginPath(); for (let k = 0; k < 6; k++) { const a = k / 6 * TAU, px = Math.cos(a) * R0, py = Math.sin(a) * R0; if (k) c.lineTo(px, py); else c.moveTo(px, py); } c.closePath(); };
+  hex(); c.lineWidth = 0.14 * u; c.strokeStyle = '#3b2f5c'; c.stroke();
+  shade(c, hex, 0, 0, R0, ['#fbf8ff', '#cfc5e6', '#6f6390'], u);
+  c.save(); hex(); c.clip(); c.strokeStyle = 'rgba(59,47,92,.25)'; c.lineWidth = 0.035 * u;
+  const ir = R0 * 0.42; c.beginPath(); for (let k = 0; k < 3; k++) { const a = -Math.PI / 2 + k / 3 * TAU; c.lineTo(Math.cos(a) * ir, Math.sin(a) * ir); } c.closePath(); c.stroke();
+  for (let k = 0; k < 6; k += 2) { const a = k / 6 * TAU; c.beginPath(); c.moveTo(Math.cos(a) * R0, Math.sin(a) * R0); c.lineTo(Math.cos(a) * ir * 0.5, Math.sin(a) * ir * 0.5); c.stroke(); }
+  c.restore();
+  const ex = 0.25 * u, ey = -0.2 * u, ew = 0.12 * u, lid = blink ? 1 : 0.5;
+  for (const sx of [-1, 1]) {
+    const x = sx * ex;
+    c.beginPath(); c.ellipse(x, ey, ew, ew * 0.9, 0, 0, TAU); c.fillStyle = '#fff'; c.fill();
+    c.beginPath(); c.arc(x, ey + 0.04 * u, 0.055 * u, 0, TAU); c.fillStyle = '#1e1636'; c.fill();
+    c.save(); c.beginPath(); c.ellipse(x, ey, ew, ew * 0.9, 0, 0, TAU); c.clip(); c.fillStyle = '#b9aed6'; c.fillRect(x - ew, ey - ew, ew * 2, ew * 2 * lid); c.restore();
+    c.beginPath(); c.ellipse(x, ey, ew, ew * 0.9, 0, 0, TAU); c.lineWidth = 0.05 * u; c.strokeStyle = '#e8506f'; c.stroke();
+  }
+  c.beginPath(); c.arc(0, 0, 0.12 * u, 0, TAU); c.fillStyle = radial(c, 0, 0, 0.12 * u, '#ffc2c2', '#ff5d6c', '#b3203a'); c.fill(); c.lineWidth = 0.04 * u; c.strokeStyle = '#5c1020'; c.stroke();
+  const dl = 0.06 * u + (RM ? 0 : (0.5 + 0.5 * Math.sin(tt * 2.6)) * 0.1 * u);
+  c.beginPath(); c.moveTo(0.05 * u, 0.1 * u); c.quadraticCurveTo(0.03 * u, 0.1 * u + dl * 0.8, 0.08 * u, 0.13 * u + dl); c.quadraticCurveTo(0.13 * u, 0.1 * u + dl * 0.8, 0.11 * u, 0.08 * u); c.closePath();
+  c.fillStyle = '#c8f0ff'; c.fill(); c.lineWidth = 0.025 * u; c.strokeStyle = '#1e1636'; c.stroke();
+  c.lineCap = 'round'; c.lineWidth = 0.06 * u; c.strokeStyle = '#1e1636'; c.beginPath();
+  if (smug) { c.moveTo(-0.16 * u, 0.24 * u); c.quadraticCurveTo(0.02 * u, 0.32 * u, 0.18 * u, 0.18 * u); } else c.arc(-0.07 * u, 0.26 * u, 0.055 * u, 0, TAU);
+  c.stroke();
+  c.save(); hex(); c.clip();
+  rrp(c, -R0, 0.34 * u, 2 * R0, 0.24 * u, 0.06 * u); c.fillStyle = '#e3405f'; c.fill();
+  c.fillStyle = '#fff3f5'; for (let k = -3; k <= 3; k++) c.fillRect(k * 0.22 * u - 0.04 * u, 0.34 * u, 0.08 * u, 0.24 * u);
+  c.restore();
+  c.save(); c.translate(0.3 * u, 0.5 * u); c.rotate(0.25 + (RM ? 0 : Math.sin(tt * 3) * 0.08));
+  rrp(c, -0.1 * u, 0, 0.2 * u, 0.48 * u, 0.05 * u); c.fillStyle = '#e3405f'; c.fill(); c.lineWidth = 0.035 * u; c.strokeStyle = '#7a1428'; c.stroke();
+  c.fillStyle = '#fff3f5'; c.fillRect(-0.1 * u, 0.18 * u, 0.2 * u, 0.07 * u);
+  c.strokeStyle = '#e3405f'; c.lineWidth = 0.03 * u; for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(k * 0.04 * u, 0.48 * u); c.lineTo(k * 0.045 * u, 0.58 * u); c.stroke(); }
+  c.restore();
+  c.restore();
+}
+function drawTest(c, s, t) {
+  const u = s * 0.36, tt = RM ? 0 : t, pulse = RM ? 1 : 1 + Math.sin(tt * 4) * 0.08;
+  const au = c.createRadialGradient(0, 0, 0.2 * u, 0, 0, 1.35 * u * pulse); au.addColorStop(0, 'rgba(255,255,255,.55)'); au.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = au; c.beginPath(); c.arc(0, 0, 1.35 * u * pulse, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(0, 0.8 * u, 0.95 * u, 0.15 * u, 0, 0, TAU); c.fillStyle = 'rgba(12,0,30,.3)'; c.fill();
+  c.save(); c.rotate(-0.14); c.lineJoin = 'round';
+  rrp(c, -1.0 * u, -0.38 * u, 2.0 * u, 0.86 * u, 0.2 * u); c.fillStyle = '#9a8fb8'; c.fill(); c.lineWidth = 0.09 * u; c.strokeStyle = '#2a1150'; c.stroke();
+  rrp(c, -1.0 * u, -0.48 * u, 2.0 * u, 0.86 * u, 0.2 * u);
+  const gr = c.createLinearGradient(0, -0.48 * u, 0, 0.38 * u); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#dcd3ee'); c.fillStyle = gr; c.fill(); c.stroke();
+  c.beginPath(); c.arc(-0.62 * u, -0.05 * u, 0.2 * u, 0, TAU); c.fillStyle = '#c9bfe0'; c.fill(); c.lineWidth = 0.05 * u; c.stroke();
+  c.beginPath(); c.arc(-0.62 * u, -0.05 * u, 0.11 * u, 0, TAU); c.fillStyle = '#6f6390'; c.fill();
+  rrp(c, -0.25 * u, -0.22 * u, 0.98 * u, 0.3 * u, 0.08 * u); c.fillStyle = '#fbf8ff'; c.fill(); c.lineWidth = 0.05 * u; c.stroke();
+  c.fillStyle = '#e3336b'; for (const lx of [0.1, 0.45]) c.fillRect(lx * u - 0.03 * u, -0.19 * u, 0.06 * u, 0.24 * u);
+  c.font = `${Math.max(6, Math.round(0.17 * u))}px ${DF}`; c.textAlign = 'center'; c.fillStyle = '#6b5591'; c.fillText('T', 0.1 * u, 0.26 * u); c.fillText('C', 0.45 * u, 0.26 * u);
+  c.restore();
+  twinkle(c, 0.78 * u, -0.72 * u, u, tt);
+}
+function drawVax(c, s, t) {
+  const u = s * 0.36, tt = RM ? 0 : t, pulse = RM ? 1 : 1 + Math.sin(tt * 4) * 0.08;
+  const au = c.createRadialGradient(0, 0, 0.2 * u, 0, 0, 1.35 * u * pulse); au.addColorStop(0, 'rgba(150,230,255,.55)'); au.addColorStop(1, 'rgba(150,230,255,0)');
+  c.fillStyle = au; c.beginPath(); c.arc(0, 0, 1.35 * u * pulse, 0, TAU); c.fill();
+  c.beginPath(); c.ellipse(0, 0.85 * u, 0.85 * u, 0.15 * u, 0, 0, TAU); c.fillStyle = 'rgba(12,0,30,.3)'; c.fill();
+  c.save(); c.rotate(-0.55); c.lineJoin = 'round'; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(0.62 * u, 0); c.lineTo(1.2 * u, 0); c.lineWidth = 0.06 * u; c.strokeStyle = '#8a94a8'; c.stroke();
+  rrp(c, 0.46 * u, -0.1 * u, 0.18 * u, 0.2 * u, 0.04 * u); c.fillStyle = '#9fe6ff'; c.fill(); c.lineWidth = 0.05 * u; c.strokeStyle = '#1f6f8b'; c.stroke();
+  c.fillStyle = '#e9eef8'; rrp(c, -1.12 * u, -0.07 * u, 0.5 * u, 0.14 * u, 0.03 * u); c.fill(); c.stroke();
+  rrp(c, -1.22 * u, -0.3 * u, 0.12 * u, 0.6 * u, 0.04 * u); c.fill(); c.stroke();
+  rrp(c, -0.7 * u, -0.26 * u, 1.18 * u, 0.52 * u, 0.1 * u); c.fillStyle = 'rgba(235,250,255,.95)'; c.fill(); c.stroke();
+  rrp(c, -0.2 * u, -0.18 * u, 0.62 * u, 0.36 * u, 0.06 * u); c.fillStyle = '#7fe7f2'; c.fill();
+  rrp(c, -0.3 * u, -0.2 * u, 0.1 * u, 0.4 * u, 0.02 * u); c.fillStyle = '#2a1150'; c.fill();
+  c.strokeStyle = 'rgba(31,111,139,.7)'; c.lineWidth = 0.03 * u; for (let k = 0; k < 5; k++) { const x = (-0.55 + k * 0.22) * u; c.beginPath(); c.moveTo(x, -0.26 * u); c.lineTo(x, -0.12 * u); c.stroke(); }
+  rrp(c, -0.78 * u, -0.42 * u, 0.1 * u, 0.84 * u, 0.04 * u); c.fillStyle = '#e9eef8'; c.fill(); c.lineWidth = 0.05 * u; c.strokeStyle = '#1f6f8b'; c.stroke();
+  c.beginPath(); c.ellipse(-0.1 * u, -0.15 * u, 0.4 * u, 0.05 * u, 0, 0, TAU); c.fillStyle = 'rgba(255,255,255,.8)'; c.fill();
+  c.restore();
+  twinkle(c, 0.72 * u, 0.55 * u, u, tt);
+}
+const coldIcon = () => icon('cold', 64, c => { c.translate(32, 32); drawCold(c, 50, 0, false, false); });
+const testIcon = () => icon('test', 64, c => { c.translate(32, 34); drawTest(c, 46, 0); });
+const vaxIcon = () => icon('vax', 64, c => { c.translate(32, 34); drawVax(c, 46, 0); });
+const goodIcon = () => icon('good', 64, c => { c.translate(32, 36); drawGood(c, 50, 0, false, false); });
+const virusIcon = () => icon('virus', 64, c => { c.translate(32, 32); drawVirus(c, 50, 0, false, false); });
+const soapIcon = () => icon('soap', 64, c => { c.translate(32, 36); drawSoap(c, 50, 0); });
+const phageIcon = () => icon('phage', 64, c => drawPhage(c, 32, 30, 56, 0));
+const bossPortrait = () => icon('pboss', 120, c => drawBug(c, { ...fakeBug('kleb'), boss: true, capsule: 2, noHud: true }, 60, 62, 100, 0, 0));
+const platePortrait = L => L.boss ? bossPortrait() : portrait(L.main);
+const resList = keys => keys.map(k => `<span class="res"><img src="${shieldIcon(DIDX[k])}" alt="">${DRUGS[DIDX[k]].name}</span>`).join('');
+
+/* ---------------- Game state ---------------- */
+let level = PLATES[0], levelIndex = 0, state = 'intro', holes = Array(9).fill(null), boss = null;
+let timeLeft = 0, elapsed = 0, spawnT = 0, lastSec = -1, sel = 0;
+let score = 0, shownScore = 0, combo = 0, bestCombo = 0, infection = 0, shownInf = 0;
+let killed = 0, escaped = 0, wasted = 0, goodHit = 0, emerged = 0, fluCleared = 0, fluEscaped = 0, stars = 0, loseWhy = '';
+let M = MODES.medium, testT = 0, vaccinated = false;
+const hidden = () => levelIndex >= M.hideFrom;
+const shown = e => !hidden() || e.tested;
+let pressure = Array(DRUGS.length).fill(0), pending = [], seen = new Set();
+let S = 400, pad = 14, cell = 124, U = 50, dpr = 1, animT = 0, shake = 0;
+const fx = [], sparks = [], pops = [], banners = [], decals = [];
+const mouse = { x: 0, y: 0, in: false };
+const mult = () => Math.min(4, 1 + Math.floor(combo / 5));
+const holePos = i => ({ x: pad + (i % 3 + 0.5) * cell, y: pad + (Math.floor(i / 3) + 0.5) * cell + cell * 0.2 });
+const easeOut = p => 1 - Math.pow(1 - clamp(p, 0, 1), 3);
+const occY = (e, y) => y + cell * 0.44 - easeOut(e.p) * cell * 0.74;
+const OCC = () => cell * 0.74;
+const headXY = (e, i) => { const { x, y } = holePos(i); return { x, y: occY(e, y) - cell * 0.22 }; };
+const usable = e => level.abx.filter(d => !e.res.has(d)).length;
+function safeAdd(e, d) { if (e.res.has(d) || !level.abx.includes(d)) return false; if (usable(e) - 1 < e.hp) return false; e.res.add(d); return true; }
+function freeHoles() { const a = []; for (let i = 0; i < 9; i++) if (!holes[i] && !(boss && i === 4)) a.push(i); return a; }
+const occupied = () => holes.filter(Boolean).length;
+
+function mkEnt(kind, sp) {
+  const e = { kind, sp, p: 0, st: 'rise', upT: 1.5, t: 0, phase: rand(0, TAU), blink: rand(1, 4), flash: 0, clank: 0, mutFlash: 0, mutColor: null, wob: 0, smug: 0,
+    tauntT: rand(2, 6), res: new Set(), known: new Set(), tested: false, hp: 1, maxHp: 1, slime: false, noHud: true, gen: 0, killed: false, bud: false };
+  if (kind === 'bug') { const s = SPECIES[sp]; e.hp = e.maxHp = s.hp; s.res.forEach(k => e.res.add(DIDX[k])); e.slime = !!s.slime; }
+  return e;
+}
+
+/* ---------------- Effects ---------------- */
+function pop(P, text, color) { pops.push({ x: P.x, y: P.y, text, color, t: 0, dur: 1.0 }); }
+function burst(P, color, n) { for (let i = 0; i < (RM ? Math.ceil(n / 3) : n); i++) { const a = rand(0, TAU), s = rand(1.5, 5) * U / 50; sparks.push({ x: P.x, y: P.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, color, size: rand(2, 5) * U / 50, t: 0, dur: rand(0.4, 0.8), g: 0.18 * U / 50 }); } }
+function ring(P, color, size = 1, dur = 0.4) { fx.push({ kind: 'ring', x: P.x, y: P.y, color, size, t: 0, dur }); }
+function arc(i0, i1, color) { fx.push({ kind: 'arc', i0, i1, color, t: 0, dur: 0.55 }); }
+function banner(text, color = '#ffcf4a', size = 0.85) { banners.length = 0; banners.push({ text, color, size, t: 0, dur: 1.2 }); }
+function addShake(a) { if (!RM) shake = Math.max(shake, a); }
+function confetti() { for (let i = 0; i < (RM ? 16 : 60); i++) sparks.push({ x: rand(0, S), y: rand(-S * 0.2, 0), vx: rand(-1, 1), vy: rand(1, 3), color: pick(['#ffcf4a', '#ff5c8a', '#7ef0b0', '#8fdcec', '#ffffff']), size: rand(3, 6) * U / 50, t: 0, dur: rand(1.4, 2.2), g: 0.04, conf: true }); }
+let lastMsg = '';
+function log(m) { if (m === lastMsg) return; $('#tick-prev').textContent = lastMsg; $('#tick-now').textContent = m; lastMsg = m; }
+function bumpInfect() { const el = $('#infect'); if (RM) return; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+function dose(d, amt = 1) { if (level.pressure && d !== AV) pressure[d] = Math.min(PMAX * 1.4, pressure[d] + amt); }
+
+/* ---------------- Spawning ---------------- */
+function firstSeen(kind, e) {
+  const key = kind === 'bug' ? (level.boss ? 'bud' : 'bug') : kind;
+  if (seen.has(key)) return; seen.add(key);
+  const M = {
+    bug: hidden() ? `${SPECIES[e.sp].name} incoming. Its shields stay hidden until a hit clanks or you use a rapid test, so start with a drug its species doesn't usually resist.` : `${SPECIES[e.sp].name} incoming. Pick a drug its shields don't show, then whack.`,
+    bud: 'The colony budded off a new bug. It inherits the colony\'s current resistance.',
+    good: 'A friendly gut bacterium. Antibiotics kill helpful bacteria too, so leave this one alone.',
+    virus: 'A flu virus. Antibiotics don\'t work on viruses, so switch to the antiviral.',
+    phage: 'A phage! It\'s a virus that infects bacteria. Whack it to set it loose.',
+    soap: 'Soap! Handwashing stops infections spreading. Whack it to cut the infection.',
+    cold: 'A common cold virus. No drug works on it, so leave it be. The immune system will clear it.',
+    test: 'A rapid test! Whack it to reveal every bug\'s shields for 8 seconds.',
+    vax: 'A flu vaccine! Whack it to cut flu for the rest of the plate.'
+  };
+  log(M[key]);
+}
+function applyPressure(e) {
+  for (const d of level.abx) {
+    if (pressure[d] >= PMAX && Math.random() < 0.25 && safeAdd(e, d)) {
+      emerged++; e.mutFlash = 0.9; e.mutColor = d; sfx('mutate');
+      log(`Overuse of ${DRUGS[d].name} selected a resistant bug. Rotate drugs to keep the pressure down.`);
+      return;
+    }
+  }
+}
+function plasmidCheck(e, i) {
+  const r = Math.floor(i / 3), c = i % 3;
+  for (const [dr, dc] of DIRS) {
+    const rr = r + dr, cc = c + dc; if (rr < 0 || rr > 2 || cc < 0 || cc > 2) continue;
+    const j = rr * 3 + cc, o = holes[j]; if (!o || o.kind !== 'bug' || o.st === 'dead' || Math.random() < 0.5) continue;
+    let changed = false, got = null;
+    for (const d of [...o.res]) if (safeAdd(e, d)) { changed = true; got = d; }
+    for (const d of [...e.res]) if (safeAdd(o, d)) { changed = true; got = got ?? d; }
+    if (changed) {
+      arc(j, i, '#ff9ab8'); arc(i, j, '#ffcf4a'); e.mutFlash = o.mutFlash = 0.8; e.mutColor = o.mutColor = got; sfx('plasmid');
+      log(`Plasmid swap! ${SPECIES[o.sp].name} and ${SPECIES[e.sp].name} shared resistance genes.`);
+    }
+  }
+}
+function effPowers() {
+  const p = [...level.powers];
+  if (hidden()) p.push('test');
+  if (level.mix.virus && !vaccinated) p.push('vax');
+  return p;
+}
+function spawn(k) {
+  const free = freeHoles(); if (!free.length) return;
+  const i = pick(free), m = level.mix, pw = effPowers();
+  const wPow = pw.length ? (m.power || 0.07) : 0, wFlu = (m.virus || 0) * 0.6 * (vaccinated ? 0.25 : 1), wCold = (m.virus || 0) * 0.4;
+  let kind = 'bug', r = Math.random();
+  if ((r -= wPow) < 0) kind = pick(pw);
+  else if ((r -= wFlu) < 0) kind = 'virus';
+  else if ((r -= wCold) < 0) kind = 'cold';
+  else if ((r -= (m.good || 0)) < 0) kind = 'good';
+  if (POWERS.has(kind) && holes.some(o => o && POWERS.has(o.kind))) kind = 'bug';
+  if (kind === 'soap' && infection < 12) kind = 'bug';
+  const e = mkEnt(kind, pick(level.sp)), baseUp = lerp(level.up[0], level.up[1], k) * M.up;
+  if (kind === 'bug') {
+    if (level.boss) { e.res = new Set(boss.res); e.hp = e.maxHp = 1; e.bud = true; arc(4, i, '#ff5c8a'); }
+    else if (levelIndex >= 2 && Math.random() < 1 / 8) { const opts = level.abx.filter(d => !e.res.has(d)); if (opts.length) safeAdd(e, pick(opts)); }
+    if (level.pressure) applyPressure(e);
+    if (testT > 0) e.tested = true;
+    e.upT = baseUp + 0.6 * (e.maxHp - 1) * M.up + (e.slime ? 0.55 : 0);
+  } else e.upT = POWERS.has(kind) ? 1.8 * M.up : baseUp + 0.25;
+  holes[i] = e;
+  if (kind === 'bug' && level.plasmid) plasmidCheck(e, i);
+  firstSeen(kind, e);
+}
+function spawnTwin(p) {
+  const free = freeHoles().filter(j => j !== p.from), list = free.length ? free : freeHoles(); if (!list.length) return;
+  const j = pick(list), tw = mkEnt('bug', p.e.sp);
+  tw.res = new Set(p.e.res); tw.known = new Set(p.e.known); tw.tested = p.e.tested || testT > 0; tw.gen = p.e.gen + 1;
+  tw.hp = tw.maxHp = Math.max(1, Math.min(SPECIES[p.e.sp].hp, usable(tw)));
+  tw.upT = (lerp(level.up[0], level.up[1], clamp(elapsed / level.time, 0, 1)) + 0.6 * (tw.maxHp - 1)) * M.up;
+  holes[j] = tw; arc(p.from, j, '#ff4f7a'); sfx('divide');
+  log(`The escaped ${SPECIES[p.e.sp].name} divided. Its twin inherits every resistance it had.`);
+}
+
+/* ---------------- Whacking ---------------- */
+function whack(i) {
+  if (state !== 'play') return;
+  const d = level.trayIdx[sel], big = boss && i === 4 && !boss.dead;
+  fx.push({ kind: 'hammer', i, d, t: 0, dur: 0.34, big });
+  if (big) { sfx('thunk'); hitBoss(d); return; }
+  const e = holes[i];
+  if (!e || e.st === 'dead' || e.p < 0.3) { sfx('whoosh'); const { x, y } = holePos(i); fx.push({ kind: 'dust', x, y: y - cell * 0.05, t: 0, dur: 0.4 }); return; }
+  sfx('thunk');
+  const H = headXY(e, i);
+  if (e.kind === 'cold') { coldHit(e, H, d); return; }
+  if (d === AV && (e.kind === 'bug' || e.kind === 'good' || e.kind === 'virus')) { antiviralHit(e, i, H); return; }
+  if (e.kind === 'bug') hitBug(e, i, d);
+  else if (e.kind === 'good') {
+    e.st = 'dead'; e.sad = true; e.t = 0; goodHit++; combo = 0; score = Math.max(0, score - 100); infection = Math.min(100, infection + 4); dose(d);
+    sfx('sad'); pop(H, '−100', '#8fd8ff'); bumpInfect();
+    log(goodHit === 1 ? 'That was a friendly gut bacterium. Wiping out helpful bacteria gives harmful ones room to grow.' : 'Friendly fire! Leave the gut bacteria alone.');
+  } else if (e.kind === 'virus') {
+    e.smug = 0.9; e.wob = 0.3; wasted++; combo = 0; dose(d, 1.5);
+    sfx('boing'); pop(H, 'No effect', '#c9d2ff');
+    log('Antibiotics don\'t work on viruses like flu. Switch to the antiviral.');
+  } else if (e.kind === 'phage') usePhage(e, i);
+  else if (e.kind === 'soap') {
+    e.st = 'dead'; e.t = 0; infection = Math.max(0, infection - 20); sfx('vax'); banner('Hands washed', '#ffd1e3', 0.75); ring(H, '#ffd1e3', 2);
+    log('Handwashing stops bacteria spreading between patients. Infection down 20 points.');
+  } else if (e.kind === 'test') {
+    e.st = 'dead'; e.t = 0; testT = 8; sfx('scan'); banner('Rapid test!', '#ffffff', 0.75); ring(H, '#ffffff', 2);
+    holes.forEach(o => { if (o && o.kind === 'bug') o.tested = true; });
+    log('Rapid test results are in. Every shield shows for 8 seconds, and tested bugs stay revealed.');
+  } else if (e.kind === 'vax') {
+    e.st = 'dead'; e.t = 0; vaccinated = true; sfx('vax'); banner('Flu jab!', '#7fe7f2', 0.8); ring(H, '#7fe7f2', 2);
+    log('Vaccinated. Far fewer flu viruses for the rest of this plate. Prevention beats cure.');
+  }
+}
+function coldHit(e, H, d) {
+  e.smug = 0.9; e.wob = 0.3; wasted++; combo = 0; sfx('boing'); pop(H, 'No effect', '#e9e3ff');
+  if (d === AV) log('There\'s no antiviral for the common cold. Leave it, and the immune system clears it.');
+  else { dose(d, 1.5); log('Antibiotics do nothing for colds. Rest and fluids let the immune system clear it.'); }
+}
+function hitBug(e, i, d) {
+  const name = e.bud ? 'The bud' : SPECIES[e.sp].name, H = headXY(e, i);
+  dose(d);
+  if (e.slime) {
+    e.slime = false; e.wob = 0.3; e.st = 'rise'; e.upT = Math.max(e.upT, 0.4) + 0.3;
+    sfx('slime'); pop(H, 'Biofilm off!', '#9dfcc8'); ring(H, '#9dfcc8', 1.4);
+    log('Biofilm soaked up that hit. Whack again to reach the bug.');
+    return;
+  }
+  if (e.res.has(d)) {
+    const wasShown = shown(e) || e.known.has(d);
+    e.clank = 0.45; e.tauntT = -0.01; wasted++; combo = 0; e.known.add(d);
+    sfx('resist'); pop(H, 'Resists!', '#e9e3ff');
+    log(wasShown ? `Clank! ${name} resists ${DRUGS[d].name}. Check the shields.` : `Clank! This ${name} resists ${DRUGS[d].name}. That shield is now revealed.`);
+    return;
+  }
+  e.hp--; e.flash = 0.25; e.wob = 0.3;
+  if (e.hp <= 0) { killEnt(e, i); return; }
+  score += 25; e.st = 'rise'; e.upT = Math.max(e.upT, 0.3) + 0.5; sfx('pop', 2);
+  const hot = level.pressure && pressure[d] >= PMAX;
+  if (Math.random() < (hot ? 1 / 3 : 1 / 8) && safeAdd(e, d)) {
+    e.mutFlash = 0.8; e.mutColor = d; e.known.add(d); sfx('mutate');
+    pop(H, 'Mutated!', DRUGS[d].light);
+    log(`${name} survived and mutated${hot ? ', helped along by overuse' : ''}. It now resists ${DRUGS[d].name}.`);
+  } else {
+    pop(H, 'Hit!', '#ffffff');
+    log(`${name} survived the hit without mutating. ${e.hp === 1 ? 'One more to finish it.' : `${e.hp} more to go.`}`);
+  }
+}
+function antiviralHit(e, i, H) {
+  if (e.kind === 'virus') {
+    e.st = 'dead'; e.t = 0; e.killed = true; combo++; bestCombo = Math.max(bestCombo, combo); fluCleared++;
+    const pts = Math.round(75 * mult()); score += pts;
+    sfx('zap'); sfx('pop', Math.min(8, combo)); pop(H, '+' + pts, '#7fe7f2'); burst(H, '#9db7ff', 12); burst(H, '#ffb36b', 6); addShake(2);
+    log(fluCleared === 1 ? 'Antiviral! Drugs like oseltamivir can shorten flu, but they do nothing to bacteria.' : 'Flu virus cleared.');
+    if (combo >= 5 && combo % 5 === 0) { banner(`Combo ×${mult()}`, '#ffcf4a', 0.8); sfx('special'); }
+    return;
+  }
+  e.wob = 0.3; sfx('boing'); pop(H, 'No effect', '#c9f3f8');
+  if (e.kind === 'good') { log('Antivirals leave gut bacteria alone, so no harm done.'); return; }
+  wasted++; combo = 0; e.tauntT = -0.01;
+  log(`Antivirals only work on viruses. ${e.bud ? 'That bud' : SPECIES[e.sp].name} needs an antibiotic.`);
+}
+function fluEscape(e, i) {
+  infection = Math.min(100, infection + M.flu); combo = 0; fluEscaped++;
+  const { x, y } = holePos(i); pop({ x, y: y - cell * 0.35 }, 'Spread!', '#c9d2ff'); sfx('escape'); bumpInfect();
+  log(fluEscaped === 1 ? `The flu virus spread. Flu can weaken the lungs and let bacterial pneumonia in, so it adds ${M.flu} points of infection.` : `Flu spread. Infection is at ${Math.round(infection)}%.`);
+}
+function killEnt(e, i) {
+  e.st = 'dead'; e.killed = true; e.flash = 1; e.t = 0;
+  combo++; bestCombo = Math.max(bestCombo, combo); killed++;
+  const pts = Math.round((100 + 50 * (e.maxHp - 1)) * mult()); score += pts;
+  prog.defeated = (prog.defeated || 0) + 1; saveProg(); updateTally(true);
+  sfx('kill'); sfx('pop', Math.min(8, combo));
+  const H = headXY(e, i), { x, y } = holePos(i);
+  pop(H, '+' + pts, '#ffcf4a'); burst(H, SPECIES[e.sp].color, 14); burst(H, '#b6ff4a', 8);
+  decals.push({ x, y: y - cell * 0.18, seed: rand(0, 10), t: 0, dur: 2.4 });
+  addShake(3);
+  if (combo >= 5 && combo % 5 === 0) { banner(`Combo ×${mult()}`, '#ffcf4a', 0.8); sfx('special'); }
+}
+function usePhage(e, i) {
+  e.st = 'dead'; e.t = 0; sfx('special'); sfx('zap'); banner('Phage attack!', '#8fdcec', 0.75);
+  let n = 0;
+  holes.forEach((o, j) => { if (o && o.kind === 'bug' && o.st !== 'dead' && o.p > 0.2) { arc(i, j, '#8fdcec'); killEnt(o, j); n++; } });
+  if (boss && !boss.dead) { arc(i, 4, '#8fdcec'); damageBoss(2); n++; }
+  if (state === 'play') log(n ? `The phage hit ${n} target${n > 1 ? 's' : ''}. Phages are viruses that infect bacteria, so drug resistance doesn't protect them.` : 'No bacteria were up, so the phage had nothing to infect.');
+}
+function bossHead() { const { x, y } = holePos(4); return { x, y: y - cell * 0.6 }; }
+function hitBoss(d) {
+  const H = bossHead();
+  if (d === AV) { boss.tauntT = -0.01; wasted++; combo = 0; sfx('boing'); pop(H, 'No effect', '#c9f3f8'); log('Antivirals do nothing to bacteria. The colony needs an antibiotic.'); return; }
+  dose(d);
+  if (boss.res.has(d)) {
+    boss.clank = 0.45; boss.tauntT = -0.01; wasted++; combo = 0;
+    sfx('resist'); pop(H, 'Resists!', '#e9e3ff');
+    log(`The colony resists ${DRUGS[d].name}. Switch to a drug it hasn't adapted to.`);
+    return;
+  }
+  boss.acq.push(d); if (boss.acq.length > 2) boss.acq.shift();
+  boss.res = new Set([DIDX.PEN, ...boss.acq]); boss.mutFlash = 0.8; boss.mutColor = d;
+  damageBoss(1);
+  if (!boss.dead) { sfx('mutate'); log(`Hit! The colony adapted to ${DRUGS[d].name}. It now resists ${[...boss.res].map(k => DRUGS[k].name).join(', ')}.`); }
+}
+function damageBoss(n) {
+  boss.hp = Math.max(0, boss.hp - n); boss.flash = 0.3; boss.wob = 0.4; score += 150 * n; addShake(6); sfx('blast');
+  const H = bossHead(); pop(H, '+' + 150 * n, '#ffcf4a'); burst(H, '#ff4f7a', 16);
+  if (boss.hp <= 0) bossDie();
+}
+function bossDie() {
+  boss.dead = true; boss.dieT = 0; score += 1000 + Math.ceil(timeLeft) * 20; prog.defeated = (prog.defeated || 0) + 1; saveProg(); updateTally(true);
+  const H = bossHead(); burst(H, '#ff4f7a', 30); burst(H, '#b6ff4a', 24); ring(H, '#ffcf4a', 3, 0.6); addShake(10);
+  holes.forEach((o, j) => { if (o && o.kind === 'bug' && o.st !== 'dead') killEnt(o, j); });
+  banner('Colony destroyed!', '#ffcf4a', 0.85);
+  log('The colony is gone, and the patient\'s immune system mops up the rest.');
+  win();
+}
+function escape(e, i) {
+  infection = Math.min(100, infection + M.esc); escaped++; combo = 0;
+  const { x, y } = holePos(i); pop({ x, y: y - cell * 0.35 }, 'Escaped!', '#ff7a9c'); sfx('escape'); addShake(2); bumpInfect();
+  log(`${e.bud ? 'A bud' : SPECIES[e.sp].name} escaped and spread. Infection is at ${Math.round(infection)}%.`);
+  if (level.divide && e.gen < 1) pending.push({ t: 0.35, from: i, e });
+}
+function selectDrug(j, quiet) {
+  if (!level.trayIdx[j] && level.trayIdx[j] !== 0) return;
+  if (j !== sel && !quiet) sfx('swap');
+  sel = j;
+  tray.querySelectorAll('.drug').forEach((b, k) => b.setAttribute('aria-checked', String(k === sel)));
+}
+
+/* ---------------- Round flow ---------------- */
+function win() {
+  if (state !== 'play') return;
+  state = 'won'; stars = infection < 20 ? 3 : infection < 50 ? 2 : 1;
+  const ms = prog.stars[M.key], mb = prog.best[M.key];
+  ms[levelIndex] = Math.max(ms[levelIndex] || 0, stars);
+  mb[levelIndex] = Math.max(mb[levelIndex] || 0, score);
+  prog.unlocked = Math.max(prog.unlocked, Math.min(PLATES.length, levelIndex + 2)); saveProg();
+  sfx('win'); confetti(); if (!level.boss) banner('Plate held!', '#7ef0b0', 0.9);
+  duckAll(); const at = levelIndex;
+  setTimeout(() => { if (state === 'won' && levelIndex === at) showWin(); }, 1200);
+}
+function lose(why) {
+  if (state !== 'play') return;
+  state = 'lost'; loseWhy = why; sfx('lose'); banner(why === 'time' ? 'Time\'s up' : 'Infection spread', '#ff7a9c', 0.85);
+  duckAll(); const at = levelIndex;
+  setTimeout(() => { if (state === 'lost' && levelIndex === at) showLose(); }, 1200);
+}
+function duckAll() { holes.forEach(e => { if (e && e.st !== 'dead') e.st = 'down'; }); pending.length = 0; }
+function pauseGame(showCard) { if (state !== 'play') return; state = 'paused'; if (showCard) showPause(); }
+function resume() { closeModal(); if (state !== 'paused') return; state = 'play'; banner('Go!', '#7ef0b0', 0.9); }
+function beginRound() {
+  closeModal(); state = 'play'; spawnT = 0.9; banner('Go!', '#7ef0b0', 1); sfx('go');
+  if (hidden() && !level.boss) log(`Treating ${plateName(level)}. Lab results are pending, so shields stay hidden until a clank or a rapid test reveals them.`); else log(level.boss ? 'Hit the colony in the centre well, and keep rotating drugs.' : levelIndex === 0 ? 'Pick a drug from the tray, then tap the bugs as they pop up.' : `Treating ${plateName(level)}. Check the shields before you whack.`);
+}
+
+/* ---------------- HUD & side panel ---------------- */
+function buildTray() {
+  tray.style.setProperty('--n', level.trayIdx.length);
+  tray.classList.toggle('pressure-on', !!level.pressure);
+  tray.innerHTML = level.trayIdx.map((d, j) => `<button class="drug" role="radio" aria-checked="${j === sel}" id="drug-${j}" data-j="${j}" title="${DRUGS[d].name} (${DRUGS[d].eg})" aria-label="${DRUGS[d].name}"><span class="key" aria-hidden="true">${j + 1}</span><img src="${trayIcon(d)}" alt=""><span class="dn">${DRUGS[d].short}</span>${d === AV ? '' : `<span class="pbar" aria-hidden="true"><span class="pfill" id="pf-${j}"></span></span>`}</button>`).join('');
+}
+tray.addEventListener('pointerdown', e => { const b = e.target.closest('.drug'); if (b) selectDrug(+b.dataset.j); });
+tray.addEventListener('click', e => { const b = e.target.closest('.drug'); if (b) selectDrug(+b.dataset.j); });
+function renderSide() {
+  const L = level, sp = SPECIES[L.main], B = L.boss;
+  const traits = B ? [`${M.bossHp} hits`, 'Adapts to the last 2 drugs', 'Buds new bugs']
+    : [`${sp.hp} hit${sp.hp > 1 ? 's' : ''}`, ...(sp.hp > 1 ? ['Can mutate'] : []), ...(sp.slime ? ['Biofilm'] : []), ...(L.divide ? ['Divides'] : []), ...(L.plasmid ? ['Plasmids'] : []), ...(L.pressure ? ['Selection pressure'] : [])];
+  if (hidden() && !B) traits.push('Shields hidden');
+  const others = [...new Set(L.sp)].filter(s => s !== L.main);
+  $('#pathogen').innerHTML = `<img src="${platePortrait(L)}" alt=""><div><h2>${L.letter ? `<span class="eletter">${L.letter}</span>` : ''}${plateName(L)}</h2><p class="latin">${B ? B.full : sp.full}</p></div>
+    <div class="ph-rows">
+      <div class="ph-row"><span class="k">Resists</span><span class="v">${resList(B ? ['PEN'] : sp.res)}</span></div>
+      <div class="ph-row"><span class="k">Traits</span><span class="v">${traits.map(x => `<span class="trait">${x}</span>`).join('')}</span></div>
+      ${others.length ? `<div class="ph-row"><span class="k">Also here</span><span class="v">${others.map(o => SPECIES[o].name).join(', ')}</span></div>` : ''}
+    </div>`;
+  const items = [];
+  if (B) {
+    items.push([bossPortrait(), 'NDM-1 colony', 'Lives in the centre well. Rotate drugs to wear it down.', 'whack']);
+    items.push([portrait('kleb'), 'Buds', 'Copies of the colony that carry its resistance.', 'whack']);
+  } else [...new Set(L.sp)].forEach(s => items.push([portrait(s), SPECIES[s].name, `Whack it with a drug its shields don't show. ${SPECIES[s].hp > 1 ? `Takes ${SPECIES[s].hp} hits.` : 'One hit.'}`, 'whack']));
+  if (L.mix.good) items.push([goodIcon(), 'Gut bacteria', 'Friendly. Antibiotics kill them too, which lets infection in.', 'leave']);
+  if (L.mix.virus) items.push([virusIcon(), 'Flu virus', 'Antibiotics do nothing to it. Hit it with the antiviral before it spreads.', 'antiviral']);
+  if (L.mix.virus) items.push([coldIcon(), 'Cold virus', 'No drug works on colds. Leave it and the immune system clears it.', 'leave']);
+  if (L.powers.includes('phage')) items.push([phageIcon(), 'Phage', 'A virus that kills bacteria. Whack it to clear every bug.', 'bonus']);
+  if (L.powers.includes('soap')) items.push([soapIcon(), 'Soap', 'Whack it to wash the infection down by 20 points.', 'bonus']);
+  if (hidden()) items.push([testIcon(), 'Rapid test', 'Whack it to show every shield for 8 seconds.', 'bonus']);
+  if (L.mix.virus) items.push([vaxIcon(), 'Flu vaccine', 'Whack it to cut flu for the rest of the plate.', 'bonus']);
+  const V = { whack: 'Whack', leave: 'Don\'t whack', bonus: 'Bonus', antiviral: 'Antiviral' };
+  $('#guide').innerHTML = items.map(([img, n, txt, v]) => `<li><img src="${img}" alt=""><span><b>${n} <span class="verdict ${v}">${V[v]}</span></b><small>${txt}</small></span></li>`).join('');
+  $('#level-chip').textContent = `Plate ${levelIndex + 1} of ${PLATES.length} · ${B ? 'Boss' : `${L.letter}: ${sp.name}`} · ${M.name}`;
+}
+const hud = {};
+function setOnce(key, v, fn) { if (hud[key] !== v) { hud[key] = v; fn(v); } }
+function updateHUD() {
+  const t = Math.max(0, Math.ceil(timeLeft));
+  setOnce('t', t, v => { $('#time').textContent = v; });
+  setOnce('low', state === 'play' && t <= 10, v => $('.stat.time').classList.toggle('low', v));
+  setOnce('m', mult(), v => { $('#mult').textContent = v > 1 ? '×' + v : ''; });
+  const iv = Math.round(shownInf);
+  setOnce('inf', iv, v => { const f = $('#ifill'); f.style.width = v + '%'; f.className = 'ifill' + (v >= 50 ? ' hot' : v >= 20 ? ' warm' : ''); $('#ival').textContent = v + '%'; $('#ibar').setAttribute('aria-valuenow', v); });
+  if (level.pressure) level.trayIdx.forEach((d, j) => {
+    if (d === AV) return;
+    const w = Math.round(Math.min(100, pressure[d] / PMAX * 100) / 5) * 5;
+    setOnce('p' + j, w, v => { const f = $('#pf-' + j); if (f) { f.style.width = v + '%'; f.className = 'pfill' + (v >= 100 ? ' hot' : v >= 60 ? ' warm' : ''); } });
+  });
+}
+
+/* ---------------- Modals ---------------- */
+const STAR = on => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z" fill="${on ? '#ffc93c' : '#e4d6f7'}" stroke="${on ? '#b4690a' : '#c8b4e8'}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+let openKind = '';
+const modePicker = () => `<div class="modes-wrap"><span class="tag">Difficulty</span><div class="modes" role="radiogroup" aria-label="Difficulty">${Object.values(MODES).map(m => `<button class="mode" role="radio" aria-checked="${prog.mode === m.key}" data-act="mode" data-m="${m.key}"><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}</div></div>`;
+function openModal(html, kind = '') {
+  openKind = kind;
+  modal.innerHTML = `<div class="card" role="dialog" aria-modal="true" aria-labelledby="mt">${html}</div>`; modal.hidden = false;
+  const f = modal.querySelector('.cta') || modal.querySelector('button'); if (f) setTimeout(() => { try { f.focus({ preventScroll: true }); } catch (e) {} }, 30);
+}
+function closeModal() { modal.hidden = true; modal.innerHTML = ''; openKind = ''; }
+function toughness(L) {
+  if (L.boss) return `Colony: ${M.bossHp} hits, adapts as you go`;
+  const sp = SPECIES[L.main]; return `${sp.hp} hit${sp.hp > 1 ? 's' : ''}${sp.slime ? ' plus biofilm' : ''}${sp.hp > 1 ? ', can mutate when it survives' : ''}`;
+}
+function showIntro() {
+  const L = level, sp = SPECIES[L.main], B = L.boss;
+  openModal(`<p class="eyebrow">${B ? `Boss plate · Plate ${levelIndex + 1} of ${PLATES.length}` : `Plate ${levelIndex + 1} of ${PLATES.length} · The ${L.letter} in ESKAPE`}</p>
+    <div class="profile-head"><img class="portrait" src="${platePortrait(L)}" alt=""><div><h2 id="mt">${L.letter ? `<span class="eletter">${L.letter}</span>` : ''}${plateName(L)}</h2><p class="latin">${B ? B.full : sp.full}</p></div></div>
+    <dl class="facts">
+      <div><dt>Under the lens</dt><dd>${sp.stain}</dd></div>
+      <div><dt>Resists</dt><dd>${resList(B ? ['PEN'] : sp.res)}</dd></div>
+      <div><dt>Toughness</dt><dd>${toughness(L)}</dd></div>
+      <div><dt>Your tray</dt><dd>${L.trayIdx.map(d => DRUGS[d].name).join(', ')}</dd></div>
+    </dl>
+    ${levelIndex === 0 ? `<p class="block"><span class="tag">The ESKAPE pathogens</span>${ESKAPE_INTRO}</p>` : ''}
+    <p class="block"><span class="tag">How this plate works</span>${L.rule.replace('{HP}', M.bossHp)}</p>
+    ${hidden() && !B ? `<p class="block"><span class="tag">Lab results pending</span>Shields stay hidden, as they would before the lab reports what a bug resists. A clank reveals that shield, and a rapid test shows every shield for 8 seconds. Until then, go by what the species usually resists.${levelIndex >= 2 ? ' About 1 in 8 bugs carries an extra resistance on top.' : ''}</p>` : ''}
+    <p class="block"><span class="tag">In the real world</span>${L.real}</p>
+    <p class="goal">${B ? `Destroy the colony within ${L.time} seconds.` : `Hold the plate for ${L.time} seconds without the infection reaching 100%.`}</p>
+    ${modePicker()}
+    <div class="actions"><button class="ghost" data-act="help">How to play</button><button class="cta" data-act="start">${B ? 'Face the boss' : 'Start whacking'}</button></div>`, 'intro');
+}
+function tallies() {
+  return `<div class="tallies"><div><b>${killed}</b><span>Whacked</span></div><div><b>${escaped}</b><span>Escaped</span></div><div><b>${wasted}</b><span>Wasted doses</span></div><div><b>${goodHit}</b><span>Friendly fire</span></div></div>`;
+}
+function showWin() {
+  const last = levelIndex === PLATES.length - 1, nextBoss = !last && PLATES[levelIndex + 1].boss;
+  openModal(`<p class="eyebrow">${level.boss ? 'Colony destroyed' : `Plate ${levelIndex + 1} held`} · ${M.name}</p><h2 id="mt">${last ? 'Every plate is clear!' : 'Infection contained!'}</h2>
+    <div class="stars">${[0, 1, 2].map(i => STAR(i < stars)).join('')}</div>
+    <p class="score-line">Score <strong>${fmt(score)}</strong> · best combo ${bestCombo}</p>
+    <p class="score-line">Finished at ${Math.round(infection)}% infection${stars < 3 ? ` · under ${stars === 1 ? 50 : 20}% earns another star` : ''}</p>
+    ${tallies()}
+    <p class="score-line" style="margin-top:10px">Lifetime total: <strong>${fmt(prog.defeated || 0)}</strong> superbugs whacked</p>
+    <div class="note"><span class="tag">Lab note</span>${level.note}</div>
+    <div class="actions"><button class="ghost" data-act="retry">Replay</button><button class="cta" data-act="${last ? 'first' : 'next'}">${last ? 'Back to plate 1' : nextBoss ? 'Face the boss' : 'Next plate'}</button></div>`);
+}
+function showLose() {
+  const tip = loseWhy === 'time' ? `The colony still had ${boss ? boss.hp : 0} hit${boss && boss.hp === 1 ? '' : 's'} left. Rotate through drugs it hasn't adapted to, and save phages for it.`
+    : wasted > escaped ? (hidden() ? 'A lot of doses bounced off hidden shields. Grab rapid tests, and start with drugs the species doesn\'t usually resist.' : 'A lot of doses bounced off. Check the shields and switch drugs before you whack.')
+    : emerged > 1 ? `Overuse bred ${emerged} resistant bugs. Spread your hits across the tray.`
+    : 'Too many bugs got away. Switch drugs quickly when a tough bug survives a hit.';
+  openModal(`<p class="eyebrow">Plate lost</p><h2 id="mt">${loseWhy === 'time' ? 'The colony survived' : 'The infection spread'}</h2>
+    ${tallies()}
+    <p class="block">${tip}</p>
+    <div class="note"><span class="tag">Did you know?</span>${pick(LOSE_FACTS)}</div>
+    <div class="actions"><button class="ghost" data-act="plates">Plates</button><button class="cta" data-act="retry">Try again</button></div>`);
+}
+function showPause() {
+  openModal(`<p class="eyebrow">Plate ${levelIndex + 1} · ${plateName(level)}</p><h2 id="mt">Paused</h2>
+    <p class="block">Treatment is on hold with ${Math.ceil(timeLeft)} seconds left and the infection at ${Math.round(infection)}%.</p>
+    <div class="actions"><button class="ghost" data-act="retry">Restart plate</button><button class="cta" data-act="resume">Resume</button></div>`);
+}
+function showPlates() {
+  openModal(`<p class="eyebrow">Choose a plate</p><h2 id="mt">The ESKAPE plates</h2>
+    <p class="block">Six hospital superbugs, named because they escape antibiotics, then a boss. Stars are kept for each difficulty.</p>
+    ${modePicker()}
+    <div class="plates">${PLATES.map((L, i) => { const locked = i + 1 > prog.unlocked, st = (prog.stars[prog.mode] || [])[i] || 0; return `<button class="plate${L.boss ? ' boss' : ''}" data-act="play" data-i="${i}" ${locked ? 'disabled' : ''}><span class="pl">${L.boss ? 'BOSS' : L.letter}</span><img src="${platePortrait(L)}" alt=""><span class="pn">${plateName(L)}</span><span class="ps" aria-label="${st} of 3 stars">${locked ? 'Locked' : '★'.repeat(st) + '☆'.repeat(3 - st)}</span></button>`; }).join('')}</div>
+    <div class="actions"><button class="ghost" data-act="close">Close</button></div>`, 'plates');
+}
+function showHelp() {
+  openModal(`<p class="eyebrow">How to play</p><h2 id="mt">Whack the right way</h2>
+    <ul class="how">
+      <li><img src="${drugIcon(1)}" alt=""><span><b>Pick a drug, then whack</b>Tap a drug in the tray, then tap bugs as they pop up. On a keyboard, <span class="kbd">1</span>–<span class="kbd">5</span> pick a drug and <span class="kbd">Q</span><span class="kbd">W</span><span class="kbd">E</span> <span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> <span class="kbd">Z</span><span class="kbd">X</span><span class="kbd">C</span> whack the wells.</span></li>
+      <li><img src="${shieldIcon(0)}" alt=""><span><b>Shields mean resistance</b>A bug shrugs off any drug matching its shields. That dose is wasted.</span></li>
+      <li><img src="${portrait('mrsa')}" alt=""><span><b>Survivors can mutate</b>About 1 in 8 tough bugs that survive a hit grow a shield for that drug. If a new shield appears, switch drugs.</span></li>
+      <li><img src="${goodIcon()}" alt=""><span><b>Spare the gut bacteria</b>They're on your side. An antibiotic hit costs 100 points and adds infection. The antiviral leaves them alone.</span></li>
+      <li><img src="${virusIcon()}" alt=""><span><b>Flu needs the antiviral</b>Antibiotics don't work on viruses, so that hit is wasted. From plate 3, switch to the antiviral. It does nothing to bacteria, and an escaped flu virus adds ${M.flu} points of infection.</span></li>
+      <li><img src="${coldIcon()}" alt=""><span><b>Leave colds alone</b>No antibiotic or antiviral works on the common cold. The immune system clears it, so a hit is a wasted dose.</span></li>
+      <li><img src="${drugIcon(3)}" alt=""><span><b>Rotate drugs</b>From plate 4, every hit fills that antibiotic's pressure bar. When it's full, survivors mutate 1 in 3 times instead of 1 in 8, and new bugs can arrive resistant.</span></li>
+      <li><img src="${phageIcon()}" alt=""><span><b>Phage</b>Whack it to destroy every bug on the plate, whatever they resist.</span></li>
+      <li><img src="${soapIcon()}" alt=""><span><b>Soap</b>Whack it to wash the infection down by 20 points.</span></li>
+      <li><img src="${testIcon()}" alt=""><span><b>Rapid test</b>When shields are hidden, whack it to show every shield for 8 seconds. A clank also reveals that bug's shield.</span></li>
+      <li><img src="${vaxIcon()}" alt=""><span><b>Flu vaccine</b>Whack it to cut flu for the rest of the plate.</span></li>
+    </ul>
+    <p class="block">Each escaped bug adds ${M.esc} points of infection, and the plate is lost at 100%. Finish under 50% for two stars and under 20% for three. Every fifth kill in a row raises your score multiplier.</p>
+    <p class="block">Easy has slower bugs and always shows shields. Medium hides shields from plate 3. Hard is faster and hides them on every plate. Change difficulty from Plates or a plate's intro.</p>
+    <div class="actions"><button class="cta" data-act="${state === 'intro' ? 'back' : 'close'}">${state === 'intro' ? 'Back' : 'Got it'}</button></div>`);
+}
+const actions = {
+  start: () => beginRound(),
+  next: () => loadLevel(levelIndex + 1, true),
+  first: () => loadLevel(0, true),
+  retry: () => loadLevel(levelIndex, false),
+  plates: () => { pauseGame(false); showPlates(); },
+  play: el => loadLevel(+el.dataset.i, true),
+  help: showHelp,
+  back: showIntro,
+  resume,
+  mode: el => { prog.mode = el.dataset.m; saveProg(); if (openKind === 'plates') showPlates(); else if (openKind === 'intro') loadLevel(levelIndex, true); },
+  close: () => { closeModal(); if (state === 'intro') showIntro(); else if (state === 'paused') resume(); }
+};
+modal.addEventListener('click', e => { const a = e.target.closest('[data-act]'); if (a && !a.disabled && actions[a.dataset.act]) actions[a.dataset.act](a); });
+$('#help-btn').addEventListener('click', () => { pauseGame(false); showHelp(); });
+$('#plates-btn').addEventListener('click', () => { pauseGame(false); showPlates(); });
+$('#restart-btn').addEventListener('click', () => loadLevel(levelIndex, false));
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(true); });
+
+function loadLevel(i, intro) {
+  levelIndex = clamp(i, 0, PLATES.length - 1); level = PLATES[levelIndex];
+  M = MODES[prog.mode] || MODES.medium; testT = 0; vaccinated = false;
+  holes = Array(9).fill(null); pending = []; seen = new Set(); pressure = Array(DRUGS.length).fill(0);
+  timeLeft = level.time; elapsed = 0; spawnT = 0; lastSec = -1;
+  score = 0; shownScore = 0; $('#score').textContent = '0'; combo = 0; bestCombo = 0; infection = 0; shownInf = 0;
+  killed = escaped = wasted = goodHit = emerged = fluCleared = fluEscaped = 0; stars = 0; shake = 0;
+  fx.length = sparks.length = pops.length = banners.length = decals.length = 0;
+  boss = level.boss ? { ...fakeBug('kleb'), kind: 'boss', boss: true, capsule: 2, hp: M.bossHp, maxHp: M.bossHp, res: new Set([DIDX.PEN]), acq: [], phase: rand(0, TAU), blink: 2, tauntT: 3, dead: false, dieT: 0 } : null;
+  const main = SPECIES[level.main].res;
+  sel = Math.max(0, level.trayIdx.findIndex(d => d !== AV && !main.includes(DRUGS[d].key)));
+  for (const k in hud) delete hud[k];
+  buildTray(); renderSide();
+  lastMsg = ''; $('#tick-prev').textContent = '';
+  if (intro) { state = 'intro'; $('#tick-now').textContent = 'Read the pathogen profile, then start whacking.'; showIntro(); }
+  else beginRound();
+  updateHUD();
+}
+
+/* ---------------- Input ---------------- */
+function toBoard(e) { const rc = canvas.getBoundingClientRect(), k = rc.width ? S / rc.width : 1; return { x: (e.clientX - rc.left) * k, y: (e.clientY - rc.top) * k }; }
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault(); unlockAudio();
+  const P = toBoard(e), c = Math.floor((P.x - pad) / cell), r = Math.floor((P.y - pad) / cell);
+  if (e.pointerType === 'mouse') { mouse.x = P.x; mouse.y = P.y; mouse.in = true; }
+  if (r >= 0 && r < 3 && c >= 0 && c < 3) whack(r * 3 + c);
+});
+canvas.addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; const P = toBoard(e); mouse.x = P.x; mouse.y = P.y; mouse.in = true; });
+canvas.addEventListener('pointerleave', () => { mouse.in = false; });
+canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchend', e => { e.preventDefault(); unlockAudio(); }, { passive: false });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  if (!modal.hidden) {
+    if (e.key === 'Escape') { if (state === 'paused') resume(); else if (modal.querySelector('[data-act="close"]')) actions.close(); }
+    return;
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (state !== 'play') return;
+  const k = e.key.toLowerCase(), n = parseInt(k, 10);
+  if (n >= 1 && n <= level.trayIdx.length) { selectDrug(n - 1); e.preventDefault(); return; }
+  const w = k.length === 1 ? WELL_KEYS.indexOf(k) : -1;
+  if (w >= 0) { e.preventDefault(); whack(w); return; }
+  if (e.key === 'Escape' || k === 'p') { e.preventDefault(); pauseGame(true); }
+});
+
+/* ---------------- Sizing ---------------- */
+function sizeBoard() {
+  const rc = wrap.getBoundingClientRect();
+  const s = Math.max(240, Math.floor(Math.min(rc.width, rc.height || rc.width)));
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.style.width = s + 'px'; canvas.style.height = s + 'px';
+  canvas.width = Math.round(s * dpr); canvas.height = Math.round(s * dpr);
+  S = s; pad = Math.round(s * 0.035); cell = (s - pad * 2) / 3; U = s / 8;
+  app.style.setProperty('--bs', s + 'px');
+}
+window.addEventListener('resize', sizeBoard);
+try { new ResizeObserver(sizeBoard).observe(wrap); } catch (e) {}
+
+/* ---------------- Loop ---------------- */
+function tickAnim(e, dt) {
+  e.flash = Math.max(0, e.flash - dt); e.clank = Math.max(0, e.clank - dt); e.mutFlash = Math.max(0, e.mutFlash - dt); e.wob = Math.max(0, e.wob - dt); e.smug = Math.max(0, (e.smug || 0) - dt);
+  e.blink -= dt; if (e.blink < -0.13) e.blink = rand(1.5, 4.5);
+  e.tauntT = (e.tauntT ?? rand(2, 7)) - dt; if (e.tauntT < -1.1) e.tauntT = rand(4, 9);
+}
+function updEnt(e, i, dt) {
+  tickAnim(e, dt);
+  if (state === 'paused') return;
+  if (e.st === 'rise') { e.p = Math.min(1, e.p + dt / 0.14); if (e.p >= 1) e.st = 'up'; }
+  else if (e.st === 'up') { e.upT -= dt; if (e.upT <= 0) e.st = 'down'; }
+  else if (e.st === 'down') { e.p -= dt / (state === 'play' ? 0.16 : 0.12); if (e.p <= 0) { holes[i] = null; if (state === 'play' && !e.killed) { if (e.kind === 'bug') escape(e, i); else if (e.kind === 'virus') fluEscape(e, i); } } }
+  else if (e.st === 'dead') { e.t += dt; e.p = Math.max(0, e.p - dt / 0.4); if (e.t >= 0.4) holes[i] = null; }
+}
+function update(dt) {
+  if (state === 'play') {
+    timeLeft -= dt; elapsed += dt;
+    const k = clamp(elapsed / level.time, 0, 1), sec = Math.ceil(timeLeft);
+    if (sec !== lastSec) { lastSec = sec; if (sec <= 5 && sec > 0) sfx('tick'); }
+    spawnT -= dt; if (testT > 0) testT = Math.max(0, testT - dt);
+    if (spawnT <= 0) { if (occupied() < Math.max(1, Math.round(lerp(level.maxUp[0], level.maxUp[1], k)) + M.maxUp)) spawn(k); spawnT = lerp(level.gap[0], level.gap[1], k) * M.gap * rand(0.75, 1.25); }
+    for (let i = pending.length - 1; i >= 0; i--) { pending[i].t -= dt; if (pending[i].t <= 0) spawnTwin(pending.splice(i, 1)[0]); }
+    if (level.pressure) for (const d of level.abx) pressure[d] = Math.max(0, pressure[d] - 0.35 * dt);
+  }
+  for (let i = 0; i < 9; i++) { const e = holes[i]; if (e) updEnt(e, i, dt); }
+  if (boss) { tickAnim(boss, dt); if (boss.dead) boss.dieT += dt; }
+  if (state === 'play') { if (infection >= 100) lose('infection'); else if (timeLeft <= 0) { timeLeft = 0; if (level.boss) lose('time'); else win(); } }
+  for (const a of [fx, pops, banners, decals]) for (let i = a.length - 1; i >= 0; i--) { a[i].t += dt; if (a[i].t >= a[i].dur) a.splice(i, 1); }
+  for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.t += dt; s.x += s.vx * dt * 60; s.y += s.vy * dt * 60; s.vy += s.g * dt * 60; if (s.conf) s.vx += Math.sin(animT * 4 + i) * 0.02; if (s.t >= s.dur) sparks.splice(i, 1); }
+  if (shake > 0) shake = Math.max(0, shake - dt * 30);
+  shownInf += (infection - shownInf) * Math.min(1, dt * 8); if (Math.abs(infection - shownInf) < 0.3) shownInf = infection;
+  if (shownScore !== score) {
+    const diff = score - shownScore;
+    shownScore += Math.sign(diff) * Math.max(1, Math.ceil(Math.abs(diff) * 0.18));
+    if (Math.sign(score - shownScore) !== Math.sign(diff)) shownScore = score;
+    $('#score').textContent = fmt(shownScore);
+  }
+  updateHUD();
+}
+
+/* ---------------- Drawing the plate ---------------- */
+function holeBack(x, y, big) {
+  const rx = cell * 0.36 * big, ry = cell * 0.12 * big;
+  g.beginPath(); g.ellipse(x, y + ry * 0.5, rx * 1.24, ry * 1.85, 0, 0, TAU); g.fillStyle = 'rgba(14,2,34,.4)'; g.fill();
+  g.beginPath(); g.ellipse(x, y, rx * 1.16, ry * 1.55, 0, 0, TAU);
+  let gr = g.createLinearGradient(0, y - ry * 1.6, 0, y + ry * 1.6); gr.addColorStop(0, '#a27bdc'); gr.addColorStop(0.5, '#6a3fab'); gr.addColorStop(1, '#3a1868');
+  g.fillStyle = gr; g.fill();
+  g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, TAU);
+  gr = g.createLinearGradient(0, y - ry, 0, y + ry); gr.addColorStop(0, '#040009'); gr.addColorStop(1, '#24113f');
+  g.fillStyle = gr; g.fill();
+}
+function holeFront(x, y, big) {
+  const rx = cell * 0.36 * big, ry = cell * 0.12 * big;
+  g.beginPath(); g.ellipse(x, y, rx * 1.16, ry * 1.55, 0, 0, Math.PI, false); g.ellipse(x, y, rx, ry, 0, Math.PI, 0, true); g.closePath();
+  const gr = g.createLinearGradient(0, y, 0, y + ry * 1.55); gr.addColorStop(0, '#c09cf0'); gr.addColorStop(1, '#5a2c95');
+  g.fillStyle = gr; g.fill();
+  g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0.06 * Math.PI, 0.94 * Math.PI); g.lineWidth = Math.max(1, cell * 0.014); g.strokeStyle = 'rgba(255,255,255,.45)'; g.stroke();
+}
+function clipHole(x, y, big) {
+  const rx = cell * 0.36 * big, ry = cell * 0.12 * big;
+  g.beginPath(); g.moveTo(x - cell * 0.56, y - cell); g.lineTo(x + cell * 0.56, y - cell); g.lineTo(x + cell * 0.56, y); g.lineTo(x + rx, y);
+  g.ellipse(x, y, rx, ry, 0, 0, Math.PI, false); g.lineTo(x - cell * 0.56, y); g.closePath(); g.clip();
+}
+function drawOcc(e, x, y) {
+  const cy = occY(e, y), s = OCC();
+  g.save(); clipHole(x, y, 1); g.translate(x, cy);
+  if (e.st === 'dead') g.scale(1.15, 0.82); else if (e.flash > 0 && e.kind === 'bug') g.scale(1.08, 0.9);
+  const blink = e.blink < 0;
+  if (e.kind === 'bug') drawBug(g, e, 0, 0, s, animT);
+  else if (e.kind === 'good') { if (e.wob > 0) g.rotate(Math.sin(animT * 40) * 0.12); drawGood(g, s, animT, !!e.sad, blink); }
+  else if (e.kind === 'virus') { if (e.wob > 0) g.rotate(Math.sin(animT * 40) * 0.15); drawVirus(g, s, animT, e.smug > 0, blink); }
+  else if (e.kind === 'phage') drawPhage(g, 0, -s * 0.04, s * 0.95, animT);
+  else if (e.kind === 'soap') drawSoap(g, s, animT);
+  else if (e.kind === 'cold') { if (e.wob > 0) g.rotate(Math.sin(animT * 40) * 0.15); drawCold(g, s, animT, e.smug > 0, blink); }
+  else if (e.kind === 'test') drawTest(g, s, animT);
+  else if (e.kind === 'vax') drawVax(g, s, animT);
+  g.restore();
+}
+function drawShields(list, x, y, bs, unknown) {
+  const step = bs * 1.9, tw = (list.length + (unknown ? 1 : 0) - 1) * step;
+  if (unknown) {
+    const bx = x - tw / 2 + list.length * step;
+    g.beginPath(); g.arc(bx, y, bs * 0.95, 0, TAU); g.fillStyle = '#5b2a95'; g.fill(); g.lineWidth = bs * 0.32; g.strokeStyle = '#1a0833'; g.stroke(); g.lineWidth = bs * 0.12; g.strokeStyle = '#fff'; g.stroke();
+    g.font = `${Math.round(bs * 1.35)}px ${DF}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText('?', bx, y + bs * 0.08); g.textBaseline = 'alphabetic';
+  }
+  list.forEach((d, i) => { const bx = x - tw / 2 + i * step; shieldPath(g, bx, y, bs); g.fillStyle = DRUGS[d].base; g.fill(); g.lineWidth = bs * 0.32; g.strokeStyle = '#1a0833'; g.stroke(); g.lineWidth = bs * 0.12; g.strokeStyle = '#fff'; g.stroke(); });
+}
+function occHud(e, x, y) {
+  if (e.kind !== 'bug' || e.st === 'dead' || e.p < 0.7) return;
+  const u = OCC() * 0.36, cy = occY(e, y), vis = shown(e), list = level.abx.filter(d => (vis ? e.res : e.known).has(d)).sort((a, b) => a - b);
+  g.save(); g.globalAlpha = clamp((e.p - 0.7) / 0.3, 0, 1);
+  if (vis && usable(e) === 0) { g.beginPath(); g.arc(x, cy, 1.3 * u, 0, TAU); g.setLineDash([0.2 * u, 0.14 * u]); g.strokeStyle = '#ff5c8a'; g.lineWidth = 0.1 * u; g.stroke(); g.setLineDash([]); }
+  if (list.length || !vis) drawShields(list, x, cy - 1.16 * u, (list.length > 2 ? 0.26 : 0.31) * u, !vis);
+  if (e.maxHp > 1) {
+    const pw = 0.3 * u, ph = 0.17 * u, gap = 0.08 * u, tw = e.maxHp * pw + (e.maxHp - 1) * gap, py = y + cell * 0.07;
+    for (let i = 0; i < e.maxHp; i++) { rrp(g, x - tw / 2 + i * (pw + gap), py, pw, ph, ph / 2); g.fillStyle = i < e.hp ? '#ffffff' : 'rgba(20,0,40,.6)'; g.fill(); g.lineWidth = 0.05 * u; g.strokeStyle = '#1a0833'; g.stroke(); }
+  }
+  g.restore();
+}
+function drawBossAt(x, y) {
+  let sc = 1, alpha = 1;
+  if (boss.dead) { const k = Math.min(1, boss.dieT / 0.6); sc = k < 0.2 ? 1 + k * 0.6 : 1.12 * (1 - (k - 0.2) / 0.8); alpha = 1 - k; if (k >= 1) return; }
+  g.save(); g.globalAlpha = alpha; g.translate(x, y - cell * 0.28); g.scale(sc, sc);
+  drawBug(g, boss, 0, 0, cell * 1.0, animT); g.restore();
+}
+function bossHud(x, y) {
+  if (boss.dead) return;
+  const u = cell * 0.36, list = level.abx.filter(d => boss.res.has(d)).sort((a, b) => a - b);
+  drawShields(list, x, y - cell * 0.28 - 1.16 * u, 0.28 * u);
+  const bw = cell * 0.78, bh = cell * 0.065, by = y + cell * 0.255, fr = boss.hp / boss.maxHp;
+  rrp(g, x - bw / 2, by, bw, bh, bh / 2); g.fillStyle = 'rgba(20,0,40,.75)'; g.fill();
+  if (fr > 0) { rrp(g, x - bw / 2, by, bw * fr, bh, bh / 2); const hg = g.createLinearGradient(x - bw / 2, 0, x + bw / 2, 0); hg.addColorStop(0, '#ff3b5c'); hg.addColorStop(1, '#ffcf4a'); g.fillStyle = hg; g.fill(); }
+  rrp(g, x - bw / 2, by, bw, bh, bh / 2); g.lineWidth = 1.2; g.strokeStyle = '#fff'; g.stroke();
+}
+function draw() {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, S, S);
+  if (shake > 0) g.translate(rand(-1, 1) * shake, rand(-1, 1) * shake);
+  rrp(g, 0, 0, S, S, S * 0.05);
+  const bgG = g.createLinearGradient(0, 0, 0, S); bgG.addColorStop(0, 'rgba(255,255,255,.15)'); bgG.addColorStop(1, 'rgba(255,255,255,.05)');
+  g.fillStyle = bgG; g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.28)'; g.stroke();
+  for (let i = 0; i < 9; i++) { const r = Math.floor(i / 3), c = i % 3; rrp(g, pad + c * cell + 3, pad + r * cell + 3, cell - 6, cell - 6, cell * 0.16); g.fillStyle = (r + c) % 2 ? 'rgba(255,255,255,.05)' : 'rgba(255,255,255,.1)'; g.fill(); }
+  for (const d of decals) {
+    const k = d.t / d.dur; g.save(); g.globalAlpha = 0.55 * (1 - k); g.translate(d.x, d.y); g.fillStyle = '#9be52a'; g.beginPath();
+    for (let i = 0; i <= 16; i++) { const a = i / 16 * TAU, rr = cell * 0.3 * (0.75 + 0.22 * Math.sin(a * 3 + d.seed) + 0.1 * Math.sin(a * 7 + d.seed * 2)); if (i) g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr * 0.8); else g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr * 0.8); }
+    g.closePath(); g.fill();
+    for (let j = 0; j < 5; j++) { const a = d.seed + j * 1.7; g.beginPath(); g.arc(Math.cos(a) * cell * 0.42, Math.sin(a) * cell * 0.32, cell * 0.035, 0, TAU); g.fill(); }
+    g.restore();
+  }
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+    const i = r * 3 + c, { x, y } = holePos(i), isBoss = boss && i === 4, big = isBoss ? 1.3 : 1;
+    holeBack(x, y, big);
+    if (isBoss) drawBossAt(x, y); else if (holes[i]) drawOcc(holes[i], x, y);
+    holeFront(x, y, big);
+    if (FINE) { g.font = `${Math.round(U * 0.22)}px ${DF}`; g.textAlign = 'left'; g.fillStyle = 'rgba(255,255,255,.4)'; g.fillText(WELL_KEYS[i].toUpperCase(), pad + c * cell + cell * 0.08, pad + (r + 1) * cell - cell * 0.08); }
+    if (isBoss) bossHud(x, y); else if (holes[i]) occHud(holes[i], x, y);
+  }
+  if (testT > 0 && state === 'play') {
+    const txt = `Test results · ${Math.ceil(testT)}s`; g.font = `${Math.round(U * 0.26)}px ${DF}`;
+    const w = g.measureText(txt).width + U * 0.45, h = U * 0.42, ty = Math.max(2, pad * 0.2);
+    rrp(g, S / 2 - w / 2, ty, w, h, h / 2); g.fillStyle = 'rgba(255,255,255,.94)'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#2a1150'; g.stroke();
+    g.fillStyle = '#2a1150'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, S / 2, ty + h / 2 + 1); g.textBaseline = 'alphabetic';
+  }
+  let swinging = false;
+  for (const f of fx) {
+    const k = f.t / f.dur;
+    if (f.kind === 'hammer') {
+      swinging = swinging || k < 0.5;
+      const { x, y } = holePos(f.i), hy = y - cell * (f.big ? 0.6 : 0.36);
+      const ang = k < 0.25 ? -1.1 * (1 - k / 0.25) : Math.sin((k - 0.25) * 28) * 0.06 * (1 - k);
+      g.save(); g.globalAlpha = k > 0.6 ? Math.max(0, (1 - k) / 0.4) : 1;
+      g.translate(x + cell * 0.5, hy); g.rotate(ang); g.translate(-cell * 0.42, 0); g.rotate(-PILL_ROT[f.d]);
+      drawDrug(g, f.d, 0, 0, cell * 1.05, animT); g.restore();
+      if (k > 0.22 && k < 0.5) { g.save(); g.globalAlpha = 1 - (k - 0.22) / 0.28; g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.lineCap = 'round'; for (let j = 0; j < 6; j++) { const a = -Math.PI + j / 5 * Math.PI, r0 = cell * 0.18, r1 = cell * (0.26 + (k - 0.22) * 0.5); g.beginPath(); g.moveTo(x + Math.cos(a) * r0 * 1.6, hy + cell * 0.12 + Math.sin(a) * r0); g.lineTo(x + Math.cos(a) * r1 * 1.6, hy + cell * 0.12 + Math.sin(a) * r1); g.stroke(); } g.restore(); }
+    } else if (f.kind === 'ring') {
+      g.save(); g.globalAlpha = 1 - k; g.beginPath(); g.arc(f.x, f.y, cell * 0.12 + k * cell * 0.3 * f.size, 0, TAU); g.strokeStyle = f.color; g.lineWidth = cell * 0.05 * (1 - k) + 1; g.stroke(); g.restore();
+    } else if (f.kind === 'dust') {
+      g.save(); g.globalAlpha = 0.55 * (1 - k); g.fillStyle = '#e6dcff';
+      for (let j = 0; j < 6; j++) { const a = Math.PI + j / 5 * Math.PI; g.beginPath(); g.arc(f.x + Math.cos(a) * cell * (0.12 + k * 0.3), f.y + Math.sin(a) * cell * (0.04 + k * 0.12), cell * 0.04 * (1 - k * 0.5), 0, TAU); g.fill(); }
+      g.restore();
+    } else if (f.kind === 'arc') {
+      const a = holePos(f.i0), b = holePos(f.i1), q = Math.min(1, k * 1.4);
+      const px = a.x + (b.x - a.x) * q, py = a.y - cell * 0.35 + (b.y - a.y) * q - Math.sin(q * Math.PI) * cell * 0.35;
+      g.save(); g.globalAlpha = k > 0.75 ? (1 - k) / 0.25 : 1; g.beginPath(); g.arc(px, py, cell * 0.08, 0, TAU); g.lineWidth = cell * 0.035; g.strokeStyle = f.color; g.stroke(); g.lineWidth = 1.5; g.strokeStyle = '#fff'; g.stroke(); g.restore();
+    }
+  }
+  for (const s of sparks) { g.globalAlpha = Math.max(0, 1 - s.t / s.dur); g.fillStyle = s.color; if (s.conf) { g.save(); g.translate(s.x, s.y); g.rotate(s.t * 6 + s.x); g.fillRect(-s.size, -s.size / 2, s.size * 2, s.size); g.restore(); } else { g.beginPath(); g.arc(s.x, s.y, s.size, 0, TAU); g.fill(); } }
+  g.globalAlpha = 1;
+  for (const p of pops) {
+    const k = p.t / p.dur, sc = k < 0.15 ? 0.6 + k / 0.15 * 0.5 : 1.1;
+    g.save(); g.globalAlpha = Math.min(1, (1 - k) * 2.5); g.translate(p.x, p.y - k * U * 0.7); g.scale(sc, sc);
+    g.font = `${Math.round(U * 0.34)}px ${DF}`; g.textAlign = 'center'; g.lineJoin = 'round';
+    g.lineWidth = U * 0.1; g.strokeStyle = '#2a1150'; g.strokeText(p.text, 0, 0); g.fillStyle = p.color; g.fillText(p.text, 0, 0); g.restore();
+  }
+  for (const b of banners) {
+    const k = b.t / b.dur, sc = k < 0.16 ? 0.4 + k / 0.16 * 0.75 : k < 0.28 ? 1.15 - (k - 0.16) / 0.12 * 0.15 : 1;
+    g.save(); g.globalAlpha = k > 0.75 ? Math.max(0, (1 - k) / 0.25) : 1;
+    g.translate(S / 2, S * 0.44 - (k > 0.75 ? (k - 0.75) * U * 1.5 : 0)); g.rotate(-0.05); g.scale(sc, sc);
+    g.font = `${Math.round(U * b.size)}px ${DF}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    const tw = g.measureText(b.text).width; if (tw > S * 0.88) { const f = S * 0.88 / tw; g.scale(f, f); }
+    g.lineWidth = U * 0.24; g.strokeStyle = '#2a1150'; g.strokeText(b.text, 0, 0); g.fillStyle = b.color; g.fillText(b.text, 0, 0);
+    g.restore();
+  }
+  g.textBaseline = 'alphabetic';
+  const cursorOn = FINE && mouse.in && state === 'play';
+  if (canvas.dataset.cur !== String(cursorOn)) { canvas.dataset.cur = String(cursorOn); canvas.style.cursor = cursorOn ? 'none' : 'pointer'; }
+  if (cursorOn && !swinging) { const d = level.trayIdx[sel]; g.save(); g.translate(mouse.x, mouse.y); g.rotate(-0.55 - PILL_ROT[d]); drawDrug(g, d, 0, 0, cell * 0.6, animT); g.restore(); }
+}
+let last = performance.now(), looping = false, errShown = false;
+function reportErr(e) {
+  if (errShown) return; errShown = true;
+  try { $('#tick-now').textContent = 'Game error: ' + (e && e.message ? e.message : e) + '. Reload to try again.'; } catch (x) {}
+}
+window.addEventListener('error', e => reportErr(e.error || e.message));
+function frame(t) {
+  try { const dt = Math.min(0.05, Math.max(0, (t - last) / 1000)); last = t; animT += dt; update(dt); draw(); } catch (e) { reportErr(e); }
+  requestAnimationFrame(frame);
+}
+let started = false;
+function start(data) {
+  if (started) return; started = true;
+  updateTally(); sizeBoard();
+  const i = data && Number.isInteger(data.levelIndex) ? data.levelIndex : Math.min(prog.unlocked, PLATES.length) - 1;
+  loadLevel(i, true);
+  if (!looping) { looping = true; last = performance.now(); requestAnimationFrame(frame); }
+}
+try { window.claude?.hot?.snapshot?.(() => ({ levelIndex })); } catch (e) {}
+const hot = window.claude && window.claude.hot;
+const boot = d => { try { start(d || {}); } catch (e) { started = false; reportErr(e); } };
+if (hot && typeof hot.ready === 'function') {
+  try { hot.ready(boot); } catch (e) {}
+  setTimeout(() => { if (!started) boot(hot.data || {}); }, 700);
+} else boot((hot && hot.data) || {});
+})();
+</script>
+
+</body></html>

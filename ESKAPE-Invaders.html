@@ -1,0 +1,812 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ESKAPE Invaders</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Layout: one-screen arcade cabinet built as a microscope eyepiece — HUD strip, bright-field stage, control deck. Single dark look by choice. */
+:root{
+  --housing:#12141a;
+  --housing-2:#1b1e27;
+  --rule:#2c313d;
+  --text:#e6eaef;
+  --muted:#8f98a7;
+  --scrim:rgba(14,16,21,.86);
+  --field:#edf2f4;
+  --glass:#fbfdfe;
+  --vignette:rgba(66,82,94,.40);
+  --ink:#232a35;
+  --ink-soft:#6b7684;
+  --violet:#6a33a3;       /* crystal violet: Gram-positive */
+  --violet-edge:#3d1866;
+  --violet-hi:#a97ddb;
+  --safranin:#d7476f;     /* safranin: Gram-negative */
+  --safranin-edge:#97203f;
+  --safranin-hi:#f39ab2;
+  --capsule:rgba(255,255,255,.92);
+  --neut-cyto:#d6dfe6;
+  --neut-edge:#8ea1af;
+  --neut-nuc:#4f6273;
+  --toxin:#3b3542;
+  --gene:#e0a12b;
+  --amox:#3d7192;         /* amoxicillin: broad spectrum */
+  --amox-edge:#1f4560;
+  --amox-hi:#8fc0dc;
+  --f-display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%}
+body{
+  height:100%;margin:0;overflow:hidden;
+  background:var(--housing);color:var(--text);font-family:var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0;
+  -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+.app{height:100%;max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:10px;padding-block:10px}
+
+/* HUD */
+.hud{display:flex;align-items:center;gap:12px}
+.brand{margin:0;display:flex;align-items:baseline;gap:.35em;min-width:0;font-family:var(--f-display);font-weight:800;font-size:1.65rem;line-height:1;letter-spacing:.03em;text-transform:uppercase}
+.brand b{font-weight:800}
+.brand .pos{color:var(--violet-hi)}
+.brand .neg{color:var(--safranin-hi)}
+.brand small{font-size:.6em;font-weight:700;letter-spacing:.14em;color:var(--muted)}
+.stats{display:flex;gap:14px;margin:0 0 0 auto}
+.stats div{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.stats dt{font-family:var(--f-mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.stats dd{margin:0;font-family:var(--f-mono);font-weight:600;font-size:1rem;font-variant-numeric:tabular-nums;line-height:1.2}
+.pips{display:flex;gap:4px;align-items:center;height:1.2rem}
+.pips i{width:8px;height:8px;border-radius:50%;background:var(--text)}
+.icon-btn{flex:none;width:36px;height:36px;border-radius:10px;border:1px solid var(--rule);background:var(--housing-2);color:var(--text);display:grid;place-items:center;cursor:pointer}
+.icon-btn svg{width:14px;height:14px}
+
+/* Stage */
+.stage{flex:1;min-height:0;display:grid;place-items:center}
+.scope{position:relative;border-radius:14px;overflow:hidden;max-width:100%;
+  box-shadow:0 0 0 1px var(--rule),0 0 0 6px var(--housing-2),0 14px 40px rgba(0,0,0,.55)}
+#game{display:block;touch-action:none}
+.overlay{position:absolute;inset:0;display:flex;padding:14px;overflow:auto;background:var(--scrim);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.panel{margin:auto;width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px}
+.eyebrow{margin:0;font-family:var(--f-mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.panel h2{margin:0;font-family:var(--f-display);font-weight:800;font-size:2rem;line-height:.95;text-transform:uppercase;letter-spacing:.01em;text-wrap:balance}
+.lede{margin:0;font-size:.86rem;line-height:1.45;color:var(--text)}
+.lede b{font-weight:600}
+.lede .pos{color:var(--violet-hi)}
+.lede .neg{color:var(--safranin-hi)}
+.lede .amx{color:var(--amox-hi)}
+.legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.legend li{display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:3px 0;border-top:1px solid var(--rule);font-size:.8rem}
+.legend li:last-child{border-bottom:1px solid var(--rule)}
+.sp{min-width:0}
+.tag{font-family:var(--f-mono);font-size:.66rem;color:var(--muted)}
+.gram{font-family:var(--f-mono);font-size:.64rem;font-weight:600;padding:2px 6px;border-radius:999px;color:#fff}
+.gram.pos{background:var(--violet)}
+.gram.neg{background:var(--safranin-edge)}
+.ico{display:block;width:36px;height:22px;border-radius:6px;background:var(--field)}
+.note{margin:0;display:grid;grid-template-columns:36px minmax(0,1fr);gap:8px;align-items:center;font-size:.76rem;line-height:1.35;color:var(--muted)}
+.cta{height:48px;border:0;border-radius:10px;cursor:pointer;color:#fff;
+  font-family:var(--f-display);font-weight:800;font-size:1.25rem;letter-spacing:.08em;text-transform:uppercase;
+  background:linear-gradient(90deg,var(--violet) 0 50%,var(--safranin-edge) 50% 100%)}
+.report{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+.report div{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--rule);padding-top:6px}
+.report dt{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.report dd{margin:0;font-family:var(--f-display);font-weight:800;font-size:1.7rem;font-variant-numeric:tabular-nums;line-height:1}
+
+/* Control deck */
+.deck{display:grid;grid-template-columns:1fr 1fr 1.7fr 1.2fr;gap:8px}
+.pad{height:60px;border-radius:12px;border:1px solid var(--rule);background:var(--housing-2);color:var(--text);font:inherit;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;touch-action:manipulation}
+.pad.on,.pad:active{background:var(--rule)}
+.pad svg{width:24px;height:24px}
+.drug[data-gram="+"]{color:var(--violet-hi);border-color:var(--violet)}
+.drug[data-gram="-"]{color:var(--safranin-hi);border-color:var(--safranin-edge)}
+.drug[data-gram="all"]{color:var(--amox-hi);border-color:var(--amox)}
+@keyframes unlock{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 4px var(--violet)}}
+.drug.unlock{animation:unlock .9s ease-in-out 3}
+@media (prefers-reduced-motion:reduce){.drug.unlock{animation:none}}
+.drug-name{font-family:var(--f-display);font-weight:800;font-size:1.2rem;letter-spacing:.05em;text-transform:uppercase;line-height:1}
+.drug-target{font-family:var(--f-mono);font-size:.64rem;letter-spacing:.06em;color:var(--muted)}
+.fire{font-family:var(--f-display);font-weight:800;font-size:1.25rem;letter-spacing:.1em;text-transform:uppercase}
+.kbd{display:none;margin:0;text-align:center;font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+button:focus-visible{outline:2px solid var(--violet-hi);outline-offset:2px}
+@media (hover:hover) and (pointer:fine){
+  .touch-only{display:none}
+  .deck{grid-template-columns:minmax(0,240px);justify-content:center}
+  .kbd{display:block}
+}
+@media (max-width:360px){ .brand small{display:none} }
+</style>
+
+<div class="app">
+  <header class="hud">
+    <h1 class="brand" aria-label="ESKAPE Invaders"><span><b class="pos">E</b><b class="pos">S</b><b class="neg">K</b><b class="neg">A</b><b class="neg">P</b><b class="neg">E</b></span><small>Invaders</small></h1>
+    <dl class="stats">
+      <div><dt>Score</dt><dd id="score">0</dd></div>
+      <div><dt>Wave</dt><dd id="wave">1</dd></div>
+      <div><dt>Host</dt><dd class="pips" id="lives"></dd></div>
+    </dl>
+    <button class="icon-btn" id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="3.5" height="12" rx="1" fill="currentColor"/></svg></button>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="scope" id="scope">
+      <canvas id="game" aria-label="Game field: a Gram-stained slide with rows of ESKAPE pathogens"></canvas>
+      <div class="overlay" id="overlay">
+        <section class="panel" id="panelStart">
+          <p class="eyebrow">Gram stain · ×1000 oil immersion</p>
+          <h2>Match the drug to the stain</h2>
+          <p class="lede"><b class="amx">Amoxicillin</b> kills everything in wave 1. Then resistance spreads: <b class="pos">linezolid</b> lyses purple Gram-positive cells, <b class="neg">colistin</b> lyses pink Gram-negative cells.</p>
+          <ul class="legend" id="legend"></ul>
+          <p class="note"><canvas class="ico" id="icoNeut" aria-hidden="true"></canvas><span>Neutrophils block toxins and engulf any pathogen they touch. Your drugs pass through them.</span></p>
+          <p class="note"><canvas class="ico" id="icoMicro" aria-hidden="true"></canvas><span>From wave 3, commensals die if your drug matches their Gram type. Lose half and pathogens regrow.</span></p>
+          <p class="note"><canvas class="ico" id="icoPlasmid" aria-hidden="true"></canvas><span>Shoot the plasmid before it crosses, or every pathogen gains resistance.</span></p>
+          <button class="cta" id="startBtn">Start treatment</button>
+        </section>
+        <section class="panel" id="panelPause" hidden>
+          <p class="eyebrow">Slide on hold</p>
+          <h2>Paused</h2>
+          <button class="cta" id="resumeBtn">Resume</button>
+        </section>
+        <section class="panel" id="panelOver" hidden>
+          <p class="eyebrow">Culture report</p>
+          <h2>Host overrun</h2>
+          <p class="lede" id="overReason"></p>
+          <dl class="report">
+            <div><dt>Score</dt><dd id="rScore">0</dd></div>
+            <div><dt>Wave reached</dt><dd id="rWave">1</dd></div>
+            <div><dt>Right-drug hits</dt><dd id="rStew">—</dd></div>
+            <div><dt>Best</dt><dd id="rBest">0</dd></div>
+          </dl>
+          <button class="cta" id="againBtn">Treat again</button>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="deck">
+    <button class="pad touch-only" id="btnLeft" aria-label="Move left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="pad touch-only" id="btnRight" aria-label="Move right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="pad drug" id="btnSwap" data-gram="all" title="Swap drug"><span class="drug-name" id="drugName">Amoxicillin</span><span class="drug-target" id="drugTarget">kills all bacteria</span></button>
+    <button class="pad fire touch-only" id="btnFire">Fire</button>
+  </div>
+  <p class="kbd">← → move · Space fire · ↑ swap drug · P pause · or drag on the slide</p>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const W = 360, H = 520;
+const canvas = $('#game'), ctx = canvas.getContext('2d');
+const scope = $('#scope'), stage = $('#stage');
+const css = getComputedStyle(document.documentElement);
+const tok = n => css.getPropertyValue(n).trim();
+const C = {
+  field: tok('--field'), glass: tok('--glass'), vignette: tok('--vignette'),
+  ink: tok('--ink'), inkSoft: tok('--ink-soft'),
+  violet: tok('--violet'), violetEdge: tok('--violet-edge'), violetHi: tok('--violet-hi'),
+  saf: tok('--safranin'), safEdge: tok('--safranin-edge'), safHi: tok('--safranin-hi'),
+  capsule: tok('--capsule'), neutCyto: tok('--neut-cyto'), neutEdge: tok('--neut-edge'), neutNuc: tok('--neut-nuc'),
+  toxin: tok('--toxin'), gene: tok('--gene'),
+  amox: tok('--amox'), amoxEdge: tok('--amox-edge'), amoxHi: tok('--amox-hi')
+};
+const STAIN = {
+  '+': { fill: C.violet, edge: C.violetEdge, hi: C.violetHi },
+  '-': { fill: C.saf, edge: C.safEdge, hi: C.safHi }
+};
+const AMOX = { fill: C.amox, edge: C.amoxEdge, hi: C.amoxHi };
+const PAL = g => g === 'all' ? AMOX : STAIN[g];
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TAU = Math.PI * 2;
+
+/* ---------- drawing primitives ---------- */
+function oval(c, x, y, rx, ry, rot, s) {
+  c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, TAU);
+  c.fillStyle = s.fill; c.fill(); c.lineWidth = 1.1; c.strokeStyle = s.edge; c.stroke();
+  c.beginPath(); c.ellipse(x - rx * .25, y - ry * .3, rx * .42, ry * .28, rot, 0, TAU);
+  c.globalAlpha = .45; c.fillStyle = s.hi; c.fill(); c.globalAlpha = 1;
+}
+function rod(c, x, y, len, w, rot, s) {
+  c.save(); c.translate(x, y); c.rotate(rot);
+  const r = w / 2, h = Math.max(0, len / 2 - r);
+  c.beginPath(); c.moveTo(-h, -r); c.lineTo(h, -r); c.arc(h, 0, r, -Math.PI / 2, Math.PI / 2);
+  c.lineTo(-h, r); c.arc(-h, 0, r, Math.PI / 2, Math.PI * 1.5); c.closePath();
+  c.fillStyle = s.fill; c.fill(); c.lineWidth = 1.1; c.strokeStyle = s.edge; c.stroke();
+  if (h > 0) {
+    c.beginPath(); c.moveTo(-h, -r * .4); c.lineTo(h, -r * .4);
+    c.lineCap = 'round'; c.lineWidth = Math.max(1, w * .22); c.globalAlpha = .5; c.strokeStyle = s.hi; c.stroke(); c.globalAlpha = 1;
+  }
+  c.restore();
+}
+function whip(c, x, y, len, ang, phase, color, amp) {
+  c.save(); c.translate(x, y); c.rotate(ang); c.beginPath();
+  for (let i = 0; i <= len; i++) {
+    const yy = Math.sin(i * .75 + phase) * amp * Math.min(1, i / 3);
+    i ? c.lineTo(i, yy) : c.moveTo(0, yy);
+  }
+  c.lineWidth = 1; c.lineCap = 'round'; c.strokeStyle = color; c.stroke(); c.restore();
+}
+function rrect(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+/* ---------- the six ESKAPE pathogens ---------- */
+function drawEf(c, x, y, f, t, s) { // diplococci
+  const g = f ? .6 : 1.8;
+  oval(c, x - 5.2 - g / 2, y + (f ? .6 : 0), 5.4, 4.6, .15, s);
+  oval(c, x + 5.2 + g / 2, y - (f ? .6 : 0), 5.4, 4.6, -.15, s);
+}
+function drawSa(c, x, y, f, t, s) { // grape-like clusters
+  const j = f ? .7 : 0;
+  const pts = [[-6.5, -2.5 + j], [0, -5], [6.5, -2.5 - j], [-3.2, 3], [3.2, 3.2 + j], [9.5, 3.5 - j]];
+  for (const [dx, dy] of pts) oval(c, x + dx, y + dy, 3.9, 3.9, 0, s);
+}
+function drawKp(c, x, y, f, t, s) { // encapsulated rod
+  c.beginPath(); c.ellipse(x, y, f ? 13 : 12.2, f ? 8.6 : 8, 0, 0, TAU);
+  c.fillStyle = C.capsule; c.fill();
+  c.setLineDash([2, 2]); c.lineWidth = 1; c.globalAlpha = .6; c.strokeStyle = s.edge; c.stroke();
+  c.globalAlpha = 1; c.setLineDash([]);
+  rod(c, x, y, 16, 7.5, f ? .08 : -.08, s);
+}
+function drawAb(c, x, y, f, t, s) { // coccobacilli pairs
+  const a = f ? .3 : .12;
+  rod(c, x - 5, y, 9.5, 7, -a, s); rod(c, x + 5, y, 9.5, 7, a, s);
+}
+function drawPa(c, x, y, f, t, s) { // rod with single polar flagellum
+  whip(c, x + 7, y, 11, 0, t * 14, s.edge, 2.2);
+  rod(c, x - 2, y, 18, 6.5, 0, s);
+}
+function drawEn(c, x, y, f, t, s) { // peritrichous rod
+  const angs = [-2.6, -1.57, -.55, .55, 1.57, 2.6];
+  angs.forEach((a, i) => whip(c, x + Math.cos(a) * 7.5, y + Math.sin(a) * 3.8, 6, a, t * 12 + i, s.edge, 1.4));
+  rod(c, x, y, 16, 8, 0, s);
+}
+function drawPlasmid(c, x, y, t) {
+  c.save(); c.translate(x, y); c.rotate(t * 1.2);
+  c.strokeStyle = C.ink; c.lineWidth = 1.6; c.beginPath(); c.arc(0, 0, 9.5, 0, TAU); c.stroke();
+  c.lineWidth = 1; c.beginPath(); c.arc(0, 0, 7, 0, TAU); c.stroke();
+  c.lineCap = 'butt'; c.lineWidth = 3.2;
+  c.strokeStyle = C.gene; c.beginPath(); c.arc(0, 0, 8.25, -.4, 1.3); c.stroke();
+  c.strokeStyle = C.inkSoft; c.beginPath(); c.arc(0, 0, 8.25, 2.2, 3.0); c.stroke();
+  c.restore();
+}
+function drawNeut(c, x, y, r, n, t) { // amoeboid neutrophil with multilobed nucleus
+  c.save(); c.translate(x, y);
+  c.beginPath();
+  for (let i = 0; i <= 40; i++) {
+    const a = i / 40 * TAU, rr = r + Math.sin(a * 5 + t * 2 + n.seed) * 1.1 + Math.sin(a * 3 - t * 1.3) * .7;
+    const px = Math.cos(a) * rr, py = Math.sin(a) * rr * .9;
+    i ? c.lineTo(px, py) : c.moveTo(px, py);
+  }
+  c.closePath(); c.fillStyle = C.neutCyto; c.fill();
+  c.lineWidth = n.flash > 0 ? 2 : 1; c.strokeStyle = n.flash > 0 ? C.toxin : C.neutEdge; c.stroke();
+  c.fillStyle = C.neutEdge;
+  for (const [gx, gy] of n.gran) { c.beginPath(); c.arc(gx * r, gy * r * .9, .8, 0, TAU); c.fill(); }
+  const k = r / 17, lobes = [[-6, -1], [0, 3], [6, -1.5]];
+  c.strokeStyle = C.neutNuc; c.lineWidth = 2 * k; c.beginPath();
+  lobes.forEach(([lx, ly], i) => i ? c.lineTo(lx * k, ly * k) : c.moveTo(lx * k, ly * k)); c.stroke();
+  c.fillStyle = C.neutNuc;
+  for (const [lx, ly] of lobes) { c.beginPath(); c.ellipse(lx * k, ly * k, 3.6 * k, 3 * k, 0, 0, TAU); c.fill(); }
+  c.restore();
+}
+
+const SPECIES = [
+  { name: 'Enterococcus faecium', tag: 'VRE', gram: '+', pts: 30, draw: drawEf },
+  { name: 'Staphylococcus aureus', tag: 'MRSA', gram: '+', pts: 30, draw: drawSa },
+  { name: 'Klebsiella pneumoniae', tag: 'KPC', gram: '-', pts: 20, draw: drawKp },
+  { name: 'Acinetobacter baumannii', tag: 'CRAB', gram: '-', pts: 20, draw: drawAb },
+  { name: 'Pseudomonas aeruginosa', tag: 'MDR', gram: '-', pts: 10, draw: drawPa },
+  { name: 'Enterobacter', spp: true, tag: 'AmpC', gram: '-', pts: 10, draw: drawEn }
+];
+const DRUGS = [{ name: 'Linezolid', gram: '+' }, { name: 'Colistin', gram: '-' }, { name: 'Amoxicillin', gram: 'all' }];
+
+/* ---------- commensal microbiome ---------- */
+function drawLacto(c, x, y, s) { rod(c, x - 4.6, y, 8.5, 4.2, .05, s); rod(c, x + 4.6, y, 8.5, 4.2, -.05, s); }
+function drawBifido(c, x, y, s) { rod(c, x - 3, y, 9, 3.8, 0, s); rod(c, x + 3.6, y - 2.4, 7, 3.4, -.6, s); rod(c, x + 3.6, y + 2.4, 7, 3.4, .6, s); }
+function drawBactero(c, x, y, s) { rod(c, x, y, 10, 5, .1, s); }
+const COMMENSALS = [
+  { name: 'Lactobacillus', gram: '+', draw: drawLacto },
+  { name: 'Bifidobacterium', gram: '+', draw: drawBifido },
+  { name: 'Bacteroides', gram: '-', draw: drawBactero }
+];
+const FRIEND = {
+  '+': { fill: C.violetHi, edge: C.violet, hi: C.glass },
+  '-': { fill: C.safHi, edge: C.saf, hi: C.glass }
+};
+const MICRO_N = 10;
+
+/* ---------- state ---------- */
+const COLS = 8, ROWS = 6, DX = 38, DY = 30, CW = 26, CH = 18;
+const PLAYER_Y = H - 36, SPEED = 160;
+let state = 'attract', prevState = 'playing';
+let score = 0, hi = 0, wave = 1, lives = 3, drug = 2, good = 0, bad = 0;
+let cells = [], fx = 0, fy = 0, dir = 1, frame = 0, tickT = 0, idleT = 0;
+let player = { x: W / 2, cd: 0, inv: 0 };
+let shots = [], toxins = [], neuts = [], nets = [], parts = [], floaters = [];
+let plasmid = null, plasmidT = 0, toxinT = 1.2;
+let microbes = [], regrowT = 0, dysWarned = false;
+let banner = null, shake = 0, clearT = 0, time = 0;
+const input = { left: false, right: false, fire: false, drag: false, dragX: W / 2 };
+
+const debris = Array.from({ length: 46 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: .5 + Math.random() * .9, a: .06 + Math.random() * .14 }));
+const vignette = (() => {
+  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .38, W / 2, H / 2, Math.hypot(W, H) / 2);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, C.vignette); return g;
+})();
+
+function makeWave(n) {
+  cells = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) cells.push({ r, c, hp: 1, alive: true });
+  fx = (W - (COLS - 1) * DX) / 2; fy = 72 + Math.min(n - 1, 5) * 8; dir = 1; frame = 0; tickT = 0;
+  shots = []; toxins = []; floaters = [];
+  neuts = [.125, .375, .625, .875].map(p => makeNeut(W * p)); nets = [];
+  microbes = n >= 3 ? makeMicrobiome() : []; regrowT = 0; dysWarned = false;
+  plasmid = null; plasmidT = 10 + Math.random() * 8; toxinT = 1.2;
+}
+
+/* ---------- HUD & overlays ---------- */
+const el = {
+  score: $('#score'), wave: $('#wave'), lives: $('#lives'),
+  drugName: $('#drugName'), drugTarget: $('#drugTarget'), swap: $('#btnSwap'),
+  overlay: $('#overlay'), start: $('#panelStart'), pause: $('#panelPause'), over: $('#panelOver'),
+  legend: $('#legend')
+};
+function hud() {
+  el.score.textContent = score.toLocaleString('en-GB');
+  el.wave.textContent = wave;
+  el.lives.innerHTML = '<i></i>'.repeat(Math.max(0, lives));
+  el.lives.setAttribute('aria-label', lives + (lives === 1 ? ' life' : ' lives'));
+}
+function updateDrug() {
+  const d = DRUGS[drug];
+  el.drugName.textContent = d.name;
+  el.drugTarget.textContent = d.gram === 'all' ? 'kills all bacteria' : 'kills Gram ' + (d.gram === '+' ? '+' : '−') + ' · swap';
+  el.swap.dataset.gram = d.gram;
+}
+function show(panel) {
+  el.overlay.hidden = false;
+  [el.start, el.pause, el.over].forEach(p => { p.hidden = p !== panel; });
+  const b = panel.querySelector('.cta'); if (b) b.focus({ preventScroll: true });
+}
+function hideOverlay() { el.overlay.hidden = true; }
+function setBanner(title, sub, life = 2) { banner = { title, sub, t: 0, life }; }
+function floater(x, y, text) { floaters.push({ x, y, text, t: 0, life: .9 }); }
+function burst(x, y, s, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU, v = 30 + Math.random() * 90;
+    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: .45 + Math.random() * .4, r: 1 + Math.random() * 2, color: Math.random() < .5 ? s.fill : s.edge });
+  }
+}
+function loadHi() { try { return +localStorage.getItem('eskape-hi') || 0; } catch (e) { return 0; } }
+function saveHi() { try { localStorage.setItem('eskape-hi', String(hi)); } catch (e) {} }
+
+/* ---------- game flow ---------- */
+function newGame() {
+  score = 0; lives = 3; wave = 1; drug = 2; good = 0; bad = 0; parts = [];
+  player = { x: W / 2, cd: 0, inv: 0 };
+  makeWave(1); state = 'playing'; hideOverlay();
+  setBanner('Wave 1', 'Amoxicillin kills them all');
+  hud(); updateDrug();
+}
+function clearInput() { input.left = input.right = input.fire = input.drag = false; document.querySelectorAll('.pad.on').forEach(b => b.classList.remove('on')); }
+function pause() { if (state !== 'playing' && state !== 'clear') return; prevState = state; state = 'paused'; clearInput(); show(el.pause); }
+function resume() { if (state !== 'paused') return; state = prevState; hideOverlay(); }
+function gameOver(reason) {
+  if (state === 'over') return;
+  state = 'over'; clearInput();
+  if (score > hi) { hi = score; saveHi(); }
+  $('#overReason').textContent = reason;
+  $('#rScore').textContent = score.toLocaleString('en-GB');
+  $('#rWave').textContent = wave;
+  $('#rStew').textContent = good + bad ? Math.round(100 * good / (good + bad)) + '%' : '—';
+  $('#rBest').textContent = hi.toLocaleString('en-GB');
+  setTimeout(() => { if (state === 'over') show(el.over); }, 800);
+}
+function hitPlayer() {
+  lives--; hud(); player.inv = 1.6; shake = reduceMotion ? 0 : .3;
+  burst(player.x, PLAYER_Y, PAL(DRUGS[drug].gram), 14); toxins = [];
+  if (lives <= 0) gameOver('Host defences exhausted. Toxins got through.');
+  else setBanner('Host hit', lives + (lives === 1 ? ' life' : ' lives') + ' left');
+}
+function swapDrug() { if (drug === 2) return; drug ^= 1; updateDrug(); }
+
+/* ---------- neutrophils ---------- */
+function makeNeut(x) {
+  const gran = Array.from({ length: 9 }, () => { const a = Math.random() * TAU, d = .35 + Math.random() * .45; return [Math.cos(a) * d, Math.sin(a) * d]; });
+  return { home: x, x, y: H - 92, hp: 8, flash: 0, seed: Math.random() * 6, gran };
+}
+const neutR = n => 9 + n.hp;
+function neutDie(n) {
+  n.dead = true;
+  burst(n.x, n.y, { fill: C.neutCyto, edge: C.neutNuc }, 16);
+  nets.push({ x: n.x, y: n.y, r: 28, t: 0, life: 5, chords: Array.from({ length: 16 }, () => [Math.random() * TAU, Math.random() * TAU]) });
+  floater(n.x, n.y - 22, 'NET cast');
+}
+function neutHit(x, y) { // toxins: absorbed by neutrophils, trapped by NETs
+  for (const n of neuts) {
+    if (n.dead) continue;
+    if (Math.hypot(x - n.x, (y - n.y) / .9) < neutR(n)) { n.hp--; n.flash = .15; if (n.hp <= 0) neutDie(n); return true; }
+  }
+  for (const net of nets) if (Math.hypot(x - net.x, y - net.y) < net.r) return true;
+  return false;
+}
+function engulf() { // phagocytosis ignores antibiotic resistance
+  for (const n of neuts) {
+    if (n.dead) continue;
+    const r = neutR(n);
+    for (const cell of cells) {
+      if (!cell.alive) continue;
+      const cx = fx + cell.c * DX, cy = fy + cell.r * DY;
+      const dx = Math.max(Math.abs(cx - n.x) - CW / 2, 0), dy = Math.max(Math.abs(cy - n.y) - CH / 2, 0);
+      if (dx * dx + dy * dy < r * r) {
+        cell.alive = false;
+        score += Math.round(SPECIES[cell.r].pts * .5 * (1 + .5 * (wave - 1))); hud();
+        burst(cx, cy, STAIN[SPECIES[cell.r].gram], 8); floater(cx, cy - 12, 'Engulfed');
+        n.hp -= 2; n.flash = .15;
+        if (n.hp <= 0) { neutDie(n); break; }
+      }
+    }
+  }
+}
+function neutDrift(dt) { // gentle chemotaxis toward the nearest column of cells
+  for (const n of neuts) {
+    if (n.dead) continue;
+    n.flash = Math.max(0, n.flash - dt);
+    let best = null;
+    for (const cell of cells) if (cell.alive) { const cx = fx + cell.c * DX; if (best === null || Math.abs(cx - n.home) < Math.abs(best - n.home)) best = cx; }
+    const target = best === null ? n.home : n.home + Math.max(-18, Math.min(18, best - n.home));
+    const d = target - n.x; n.x += Math.sign(d) * Math.min(Math.abs(d), 8 * dt);
+  }
+}
+
+/* ---------- microbiome ---------- */
+function makeMicrobiome() {
+  const kinds = [0, 2, 1, 2, 0, 2, 1, 2, 0, 2].sort(() => Math.random() - .5);
+  return kinds.map((k, i) => ({ x: 18 + i * 36 + (Math.random() - .5) * 10, y: 372 + (Math.random() - .5) * 12, kind: k, alive: true, phase: Math.random() * TAU }));
+}
+const mPos = m => m.x + Math.sin(time * .7 + m.phase) * 6;
+const microAlive = () => microbes.reduce((n, m) => n + m.alive, 0);
+const dysbiotic = () => microbes.length > 0 && microAlive() <= MICRO_N / 2;
+function loseCommensal(m, mx, label) {
+  m.alive = false;
+  burst(mx, m.y, FRIEND[COMMENSALS[m.kind].gram], 8);
+  floater(mx, m.y - 10, label);
+  if (!dysWarned && dysbiotic()) {
+    dysWarned = true; regrowT = 3;
+    setBanner('Dysbiosis', 'Pathogens now regrow into the gaps', 2.4);
+  }
+}
+function outcompete() {
+  for (const m of microbes) {
+    if (!m.alive) continue;
+    const mx = mPos(m);
+    for (const cell of cells) {
+      if (!cell.alive) continue;
+      if (Math.abs(fx + cell.c * DX - mx) < CW / 2 + 7 && Math.abs(fy + cell.r * DY - m.y) < CH / 2 + 4) { loseCommensal(m, mx, 'Outcompeted'); break; }
+    }
+  }
+}
+function regrow() { // lost colonisation resistance lets pathogens refill empty slots
+  if (!cells.some(c => c.alive)) return;
+  const dead = cells.filter(c => !c.alive); if (!dead.length) return;
+  const cell = dead[Math.floor(Math.random() * dead.length)];
+  cell.alive = true; cell.hp = 1;
+  const x = fx + cell.c * DX, y = fy + cell.r * DY;
+  burst(x, y, STAIN[SPECIES[cell.r].gram], 6); floater(x, y - 12, 'Regrowth');
+}
+
+/* ---------- update ---------- */
+function tickInterval() {
+  let alive = 0; for (const c of cells) alive += c.alive;
+  return Math.max(.03, (.05 + .62 * alive / (COLS * ROWS)) * Math.pow(.88, wave - 1));
+}
+function step() {
+  const alive = cells.filter(c => c.alive); if (!alive.length) return;
+  let minC = COLS, maxC = -1, maxR = -1;
+  for (const c of alive) { minC = Math.min(minC, c.c); maxC = Math.max(maxC, c.c); maxR = Math.max(maxR, c.r); }
+  const left = fx + minC * DX - CW / 2, right = fx + maxC * DX + CW / 2, sx = 6;
+  if ((dir > 0 && right + sx > W - 6) || (dir < 0 && left - sx < 6)) { fy += 12; dir *= -1; } else fx += dir * sx;
+  frame ^= 1;
+  if (fy + maxR * DY + CH / 2 >= PLAYER_Y - 14) gameOver('The infection reached the host.');
+}
+function fireToxin() {
+  if (toxins.length >= 3 + wave) return;
+  const bottoms = new Map();
+  for (const c of cells) if (c.alive) { const b = bottoms.get(c.c); if (!b || c.r > b.r) bottoms.set(c.c, c); }
+  const arr = [...bottoms.values()]; if (!arr.length) return;
+  const pick = Math.random() < .35
+    ? arr.reduce((a, b) => Math.abs(fx + a.c * DX - player.x) < Math.abs(fx + b.c * DX - player.x) ? a : b)
+    : arr[Math.floor(Math.random() * arr.length)];
+  toxins.push({ x: fx + pick.c * DX, y: fy + pick.r * DY + CH / 2 + 2, v: 120 + wave * 12 });
+}
+function shotHit(s, x, y) {
+  if (plasmid && Math.hypot(x - plasmid.x, y - plasmid.y) < 11) {
+    s.dead = true;
+    const bonus = [50, 100, 150, 300][Math.floor(Math.random() * 4)];
+    score += bonus; hud();
+    burst(plasmid.x, plasmid.y, { fill: C.gene, edge: C.ink }, 14);
+    floater(plasmid.x, plasmid.y + 16, '+' + bonus);
+    setBanner('Plasmid destroyed', 'No resistance transfer');
+    plasmid = null; plasmidT = 16 + Math.random() * 10; return;
+  }
+  for (const m of microbes) { // drugs pass through commensals of the other Gram type
+    if (!m.alive || (s.gram !== 'all' && COMMENSALS[m.kind].gram !== s.gram)) continue;
+    const mx = mPos(m);
+    if (Math.abs(x - mx) < 7.5 && Math.abs(y - m.y) < 5) {
+      s.dead = true; score = Math.max(0, score - 25); hud();
+      loseCommensal(m, mx, 'Commensal lost'); return;
+    }
+  }
+  for (const cell of cells) {
+    if (!cell.alive) continue;
+    const cx = fx + cell.c * DX, cy = fy + cell.r * DY;
+    if (Math.abs(x - cx) <= CW / 2 && Math.abs(y - cy) <= CH / 2 + 1) {
+      s.dead = true;
+      const sp = SPECIES[cell.r], st = STAIN[sp.gram];
+      if (s.gram === 'all' || sp.gram === s.gram) {
+        good++; cell.hp--;
+        if (cell.hp <= 0) { cell.alive = false; score += Math.round(sp.pts * (1 + .5 * (wave - 1))); burst(cx, cy, st, 12); }
+        else burst(x, y, st, 4);
+        hud();
+      } else {
+        bad++; floater(cx, cy - 13, 'Resistant'); burst(x, y, PAL(s.gram), 3);
+      }
+      return;
+    }
+  }
+  for (const t of toxins) {
+    if (!t.dead && Math.abs(t.x - x) < 4 && Math.abs(t.y - y) < 6) {
+      t.dead = true; s.dead = true; burst(x, y, { fill: C.toxin, edge: C.inkSoft }, 4); return;
+    }
+  }
+}
+function update(dt) {
+  time += dt;
+  if (state === 'paused') return;
+  for (const p of parts) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .96; p.vy *= .96; }
+  parts = parts.filter(p => p.t < p.life);
+  for (const f of floaters) { f.t += dt; f.y -= 18 * dt; }
+  floaters = floaters.filter(f => f.t < f.life);
+  for (const n of nets) n.t += dt;
+  nets = nets.filter(n => n.t < n.life);
+  if (banner) { banner.t += dt; if (banner.t > banner.life) banner = null; }
+  shake = Math.max(0, shake - dt);
+
+  if (state === 'attract' || state === 'over') { idleT += dt; if (idleT > .55) { idleT = 0; frame ^= 1; } return; }
+
+  // player
+  const mv = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  if (input.drag) { const d = input.dragX - player.x; player.x += Math.sign(d) * Math.min(Math.abs(d), SPEED * 1.4 * dt); }
+  else player.x += mv * SPEED * dt;
+  player.x = Math.max(14, Math.min(W - 14, player.x));
+  player.cd -= dt; player.inv = Math.max(0, player.inv - dt);
+  if ((input.fire || input.drag) && player.cd <= 0 && shots.length < 2) {
+    shots.push({ x: player.x, y: PLAYER_Y - 18, gram: DRUGS[drug].gram }); player.cd = .32;
+  }
+  // drug shots
+  for (const s of shots) {
+    const ny = s.y - 330 * dt;
+    for (let y = s.y; y >= ny && !s.dead; y -= 2) shotHit(s, s.x, y);
+    if (!s.dead) s.y = ny;
+    if (s.y < -10) s.dead = true;
+  }
+  shots = shots.filter(s => !s.dead);
+  // toxins
+  for (const t of toxins) {
+    if (t.dead) continue;
+    const ny = t.y + t.v * dt;
+    for (let y = t.y; y <= ny && !t.dead; y += 2) {
+      if (neutHit(t.x, y)) { t.dead = true; break; }
+      if (state === 'playing' && player.inv <= 0 && Math.abs(t.x - player.x) < 8 && y > PLAYER_Y - 16 && y < PLAYER_Y + 18) { t.dead = true; hitPlayer(); break; }
+    }
+    if (!t.dead) t.y = ny;
+    if (t.y > H + 10) t.dead = true;
+  }
+  toxins = toxins.filter(t => !t.dead);
+  neutDrift(dt); if (state === 'playing') engulf();
+
+  if (state === 'playing') {
+    tickT += dt; if (tickT >= tickInterval()) { tickT = 0; step(); }
+    if (state !== 'playing') return;
+    outcompete();
+    if (dysbiotic()) { regrowT -= dt; if (regrowT <= 0) { regrowT = 4; regrow(); } }
+    toxinT -= dt; if (toxinT <= 0) { fireToxin(); toxinT = (.5 + Math.random() * .9) / (1 + .18 * (wave - 1)); }
+    if (!plasmid) {
+      plasmidT -= dt;
+      if (plasmidT <= 0) { const d = Math.random() < .5 ? 1 : -1; plasmid = { x: d > 0 ? -14 : W + 14, d, y: 46 }; }
+    } else {
+      plasmid.x += plasmid.d * 58 * dt;
+      if ((plasmid.d > 0 && plasmid.x > W + 14) || (plasmid.d < 0 && plasmid.x < -14)) {
+        plasmid = null; plasmidT = 16 + Math.random() * 10;
+        let n = 0; for (const c of cells) if (c.alive && c.hp < 3) { c.hp++; n++; }
+        if (n) setBanner('Plasmid transferred', 'Every cell needs one more hit', 2.4);
+      }
+    }
+    if (!cells.some(c => c.alive)) {
+      state = 'clear'; clearT = 2.2; toxins = []; plasmid = null;
+      const bonus = microAlive() * 20 * wave; score += bonus; hud();
+      setBanner('Culture cleared', microbes.length ? 'Microbiome bonus +' + bonus : 'Wave ' + (wave + 1) + ' incoming', 2.1);
+    }
+  } else if (state === 'clear') {
+    clearT -= dt;
+    if (clearT <= 0) {
+      wave++; makeWave(wave); state = 'playing'; hud();
+      if (wave === 2) {
+        drug = 0; updateDrug();
+        el.swap.classList.add('unlock'); setTimeout(() => el.swap.classList.remove('unlock'), 2800);
+        setBanner('Amoxicillin fails', 'Now: linezolid for purple, colistin for pink', 3.2);
+      } else if (wave === 3) setBanner('Wave 3', 'Spare the commensal microbiome', 2.6);
+      else setBanner('Wave ' + wave, 'Faster growth, more toxins');
+    }
+  }
+}
+
+/* ---------- render ---------- */
+function drawSyringe(c, x, y, s) {
+  c.save(); c.strokeStyle = C.ink; c.fillStyle = C.ink; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(x, y - 17); c.lineTo(x, y - 9); c.stroke();
+  c.fillRect(x - 2.5, y - 10, 5, 3);
+  c.fillStyle = C.glass; c.fillRect(x - 6.5, y - 7, 13, 17);
+  c.fillStyle = s.fill; c.fillRect(x - 6.5, y - 7, 13, 11);
+  c.fillStyle = C.ink; c.fillRect(x - 6.5, y + 4, 13, 2);
+  c.strokeRect(x - 6.5, y - 7, 13, 17);
+  c.beginPath(); for (let i = 0; i < 4; i++) { c.moveTo(x - 6.5, y - 4 + i * 3); c.lineTo(x - 3.5, y - 4 + i * 3); }
+  c.lineWidth = .8; c.strokeStyle = C.glass; c.stroke();
+  c.fillRect(x - 11, y + 10, 22, 2.2);
+  c.fillRect(x - 1.5, y + 12, 3, 4);
+  c.fillRect(x - 6, y + 16, 12, 2.2);
+  c.restore();
+}
+function drawField(c) {
+  c.fillStyle = C.field; c.fillRect(0, 0, W, H);
+  c.fillStyle = C.inkSoft;
+  for (const d of debris) { c.globalAlpha = d.a; c.beginPath(); c.arc(d.x, d.y, d.r, 0, TAU); c.fill(); }
+  c.globalAlpha = 1;
+  c.fillStyle = vignette; c.fillRect(0, 0, W, H);
+  c.fillStyle = C.inkSoft; c.font = '400 9px "IBM Plex Mono", ui-monospace, monospace';
+  c.textBaseline = 'alphabetic'; c.textAlign = 'left';
+  c.fillText('GRAM STAIN  ×1000', 10, H - 8);
+  c.textAlign = 'center'; c.fillText('5 µm', W - 32, H - 12);
+  c.fillRect(W - 55, H - 9, 45, 2);
+}
+function draw() {
+  const c = ctx;
+  c.save();
+  if (shake > 0) c.translate((Math.random() - .5) * 4, (Math.random() - .5) * 4);
+  drawField(c);
+  for (const net of nets) {
+    c.globalAlpha = .75 * (1 - net.t / net.life); c.strokeStyle = C.neutNuc; c.lineWidth = .7; c.beginPath();
+    for (const [a1, a2] of net.chords) { c.moveTo(net.x + Math.cos(a1) * net.r, net.y + Math.sin(a1) * net.r); c.lineTo(net.x + Math.cos(a2) * net.r, net.y + Math.sin(a2) * net.r); }
+    c.stroke(); c.globalAlpha = 1;
+  }
+  for (const n of neuts) if (!n.dead) drawNeut(c, n.x, n.y, neutR(n), n, time);
+  for (const m of microbes) if (m.alive) { const k = COMMENSALS[m.kind]; k.draw(c, mPos(m), m.y, FRIEND[k.gram]); }
+  if (microbes.length) {
+    const mn = microAlive(), low = dysbiotic();
+    c.font = '400 9px "IBM Plex Mono", ui-monospace, monospace'; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    c.fillStyle = low ? C.safEdge : C.inkSoft; c.fillText(low ? 'DYSBIOSIS' : 'MICROBIOME', 10, 17);
+    for (let i = 0; i < MICRO_N; i++) {
+      c.globalAlpha = i < mn ? 1 : .3; c.fillStyle = i < mn ? (low ? C.safEdge : C.ink) : C.neutEdge;
+      c.fillRect(70 + i * 6, 9, 4, 9);
+    }
+    c.globalAlpha = 1;
+  }
+  for (const cell of cells) {
+    if (!cell.alive) continue;
+    const x = fx + cell.c * DX, y = fy + cell.r * DY, sp = SPECIES[cell.r], s = STAIN[sp.gram];
+    if (cell.hp > 1) {
+      c.save(); c.setLineDash([3, 2]); c.lineWidth = 1.2; c.strokeStyle = s.edge;
+      for (let i = 0; i < cell.hp - 1; i++) { const p = 1 + i * 3; rrect(c, x - CW / 2 - p, y - CH / 2 - p, CW + 2 * p, CH + 2 * p, 6 + i * 2); c.stroke(); }
+      c.restore();
+    }
+    sp.draw(c, x, y, frame, time, s);
+  }
+  if (plasmid) drawPlasmid(c, plasmid.x, plasmid.y, time);
+  for (const s of shots) rod(c, s.x, s.y, 10, 4, Math.PI / 2, PAL(s.gram));
+  const zig = Math.floor(time * 16) % 2 ? 1.5 : -1.5;
+  c.strokeStyle = C.toxin; c.lineWidth = 1.8; c.lineCap = 'round'; c.lineJoin = 'round';
+  for (const t of toxins) {
+    c.beginPath(); c.moveTo(t.x + zig, t.y - 5); c.lineTo(t.x - zig, t.y - 2); c.lineTo(t.x + zig, t.y + 1); c.lineTo(t.x - zig, t.y + 4); c.stroke();
+  }
+  if (!(player.inv > 0 && Math.floor(time * 12) % 2)) drawSyringe(c, player.x, PLAYER_Y, PAL(DRUGS[drug].gram));
+  for (const p of parts) { c.globalAlpha = Math.max(0, 1 - p.t / p.life); c.fillStyle = p.color; c.beginPath(); c.arc(p.x, p.y, p.r, 0, TAU); c.fill(); }
+  c.globalAlpha = 1;
+  c.font = '600 9px "IBM Plex Mono", ui-monospace, monospace'; c.textAlign = 'center';
+  for (const f of floaters) { c.globalAlpha = Math.max(0, 1 - f.t / f.life); c.fillStyle = C.ink; c.fillText(f.text, f.x, f.y); }
+  c.globalAlpha = 1;
+  if (banner) {
+    const a = Math.max(0, Math.min(1, banner.t * 6, (banner.life - banner.t) * 3));
+    const by = H * .58;
+    c.globalAlpha = a * .82; c.fillStyle = C.field; c.fillRect(0, by - 30, W, 52);
+    c.globalAlpha = a; c.fillStyle = C.ink; c.textAlign = 'center';
+    c.font = '800 26px "Big Shoulders Display", Impact, sans-serif';
+    c.fillText(banner.title.toUpperCase(), W / 2, by);
+    if (banner.sub) { c.font = '400 10.5px "IBM Plex Mono", ui-monospace, monospace'; c.fillStyle = C.inkSoft; c.fillText(banner.sub, W / 2, by + 16); }
+    c.globalAlpha = 1;
+  }
+  c.restore();
+}
+
+/* ---------- sizing ---------- */
+function fit() {
+  const r = stage.getBoundingClientRect();
+  const sc = Math.max(.1, Math.min(r.width / W, r.height / H));
+  const cw = Math.floor(W * sc), ch = Math.floor(H * sc);
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  scope.style.width = cw + 'px'; scope.style.height = ch + 'px';
+  canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+  canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+  ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  draw();
+}
+function icon(cv, fn) {
+  const w = 36, h = 22, r = Math.min(window.devicePixelRatio || 1, 3);
+  cv.width = w * r; cv.height = h * r;
+  const c = cv.getContext('2d'); c.setTransform(r, 0, 0, r, 0, 0); c.clearRect(0, 0, w, h); fn(c, w / 2, h / 2);
+}
+function buildLegend() {
+  el.legend.innerHTML = SPECIES.map((s, i) =>
+    `<li><canvas class="ico" data-i="${i}" aria-hidden="true"></canvas><span class="sp"><i>${s.name}</i>${s.spp ? ' spp.' : ''}</span><span class="tag">${s.tag}</span><span class="gram ${s.gram === '+' ? 'pos' : 'neg'}">G${s.gram === '+' ? '+' : '−'}</span></li>`
+  ).join('');
+  el.legend.querySelectorAll('canvas').forEach(cv => { const sp = SPECIES[+cv.dataset.i]; icon(cv, (c, x, y) => sp.draw(c, x, y, 0, .4, STAIN[sp.gram])); });
+  icon($('#icoPlasmid'), (c, x, y) => drawPlasmid(c, x, y, .6));
+  icon($('#icoNeut'), (c, x, y) => drawNeut(c, x, y, 9.5, { seed: 1, flash: 0, gran: [[.5, .3], [-.5, .45], [.2, -.6], [-.3, -.5], [.6, -.2]] }, 0));
+  icon($('#icoMicro'), (c, x, y) => { drawBifido(c, x - 8, y - 2, FRIEND['+']); drawBactero(c, x + 9, y + 3, FRIEND['-']); });
+}
+
+/* ---------- input ---------- */
+const KEYMAP = { ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ' ': 'fire' };
+const active = () => state === 'playing' || state === 'clear';
+addEventListener('keydown', e => {
+  const tag = document.activeElement && document.activeElement.tagName;
+  if ((e.key === ' ' || e.key === 'Enter') && state === 'attract' && tag !== 'BUTTON') { e.preventDefault(); newGame(); return; }
+  if (KEYMAP[e.key]) { if (active()) { e.preventDefault(); input[KEYMAP[e.key]] = true; } return; }
+  if (['ArrowUp', 'w', 'W', 'q', 'Q'].includes(e.key) && active()) { e.preventDefault(); if (!e.repeat) swapDrug(); return; }
+  if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { state === 'paused' ? resume() : pause(); }
+});
+addEventListener('keyup', e => { if (KEYMAP[e.key]) { input[KEYMAP[e.key]] = false; if (active()) e.preventDefault(); } });
+function hold(btn, key) {
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); try { btn.setPointerCapture(e.pointerId); } catch (_) {} input[key] = true; btn.classList.add('on'); });
+  const up = () => { input[key] = false; btn.classList.remove('on'); };
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => btn.addEventListener(ev, up));
+}
+hold($('#btnLeft'), 'left'); hold($('#btnRight'), 'right'); hold($('#btnFire'), 'fire');
+el.swap.addEventListener('click', swapDrug);
+const toLogical = e => { const r = canvas.getBoundingClientRect(); return (e.clientX - r.left) / r.width * W; };
+canvas.addEventListener('pointerdown', e => { if (!active()) return; try { canvas.setPointerCapture(e.pointerId); } catch (_) {} input.drag = true; input.dragX = toLogical(e); });
+canvas.addEventListener('pointermove', e => { if (input.drag) input.dragX = toLogical(e); });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => canvas.addEventListener(ev, () => { input.drag = false; }));
+$('#startBtn').addEventListener('click', newGame);
+$('#againBtn').addEventListener('click', newGame);
+$('#resumeBtn').addEventListener('click', resume);
+$('#pauseBtn').addEventListener('click', () => state === 'paused' ? resume() : pause());
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+/* ---------- loop ---------- */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+function start(data) {
+  hi = Math.max(loadHi(), +(data && data.hi) || 0);
+  buildLegend(); makeWave(1); hud(); updateDrug();
+  fit();
+  if ('ResizeObserver' in window) new ResizeObserver(fit).observe(stage); else addEventListener('resize', fit);
+  show(el.start);
+  requestAnimationFrame(t => { last = t; loop(t); });
+}
+try { window.claude?.hot?.snapshot?.(() => ({ hi })); } catch (e) {}
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+
+</body></html>
