@@ -186,6 +186,8 @@ figure a { display: block; }
 .demo a { text-decoration: none; color: var(--ink); display: block; }
 .demo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #000; }
 .demo p { margin: 0; padding: 14px 18px; font-weight: 600; }
+.demo p strong { display: block; font-family: var(--serif); font-size: 1.12rem; color: var(--aubergine); }
+.demo p span { display: block; font-weight: 400; font-size: .95rem; color: var(--muted); margin-top: 4px; line-height: 1.45; }
 .demo:hover { border-color: var(--aubergine); }
 
 /* ---------- Complexes ---------- */
