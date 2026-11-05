@@ -28,28 +28,30 @@ TITLE_TAGS = {"i", "b", "sup", "sub", "u"}
 
 def eutils(endpoint, **params):
     params.update(tool="stansfeld-group-site")
-    data = urllib.parse.urlencode(params).encode()
-    for attempt in range(4):
+    url = EUTILS + endpoint + "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"User-Agent": "stansfeld-group-site (+https://pstansfeld.github.io/group/)"})
+    for attempt in range(5):
         try:
-            with urllib.request.urlopen(EUTILS + endpoint, data=data, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=60) as r:
                 return r.read().decode("utf-8")
-        except Exception as e:  # network blip or NCBI rate limit: back off and retry
-            if attempt == 3:
+        except Exception as e:  # network blip, NCBI busy or rate limit: back off and retry
+            body = e.read(300).decode("utf-8", "replace") if hasattr(e, "read") else ""
+            print(f"  {endpoint} attempt {attempt + 1} failed: {e} {body!r}", file=sys.stderr)
+            if attempt == 4:
                 raise
-            print(f"  retrying {endpoint} after error: {e}", file=sys.stderr)
-            time.sleep(5 * (attempt + 1))
+            time.sleep(10 * (attempt + 1))
 
 
 def fetch_ids():
-    res = json.loads(eutils("esearch.fcgi", db="pubmed", term=TERM, retmax=2000, retmode="json"))
+    res = json.loads(eutils("esearch.fcgi", db="pubmed", term=TERM, retmax=1000, retmode="json"))
     return res["esearchresult"]["idlist"]
 
 
 def fetch_records(ids):
     out = []
-    for i in range(0, len(ids), 200):
-        out.append(eutils("efetch.fcgi", db="pubmed", id=",".join(ids[i:i + 200]), retmode="xml"))
-        time.sleep(0.5)
+    for i in range(0, len(ids), 100):
+        out.append(eutils("efetch.fcgi", db="pubmed", id=",".join(ids[i:i + 100]), retmode="xml"))
+        time.sleep(1)
     return out
 
 
