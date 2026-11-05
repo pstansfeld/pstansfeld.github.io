@@ -284,3 +284,29 @@ figure a { display: block; }
 .themes .card p { font-size: 1rem; }
 .see-all { margin: 14px 0 0; font-weight: 600; }
 @media (max-width: 760px) { .themes { grid-template-columns: 1fr; } }
+
+/* ---------- Members: interactive group photo ---------- */
+.groupshot { position: relative; margin: 0 0 10px; }
+.gs-frame { position: relative; }
+.gs-frame > img { width: 100%; height: auto; border-radius: var(--radius); background: var(--tint); }
+.groupshot svg { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: var(--radius); }
+.groupshot .who { fill: transparent; cursor: pointer; outline: none; }
+.groupshot .who.on { stroke: #fff; stroke-width: 3; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 5px rgba(0,0,0,.5)); }
+.groupshot .veil { fill: rgba(255,255,255,.62); fill-rule: evenodd; pointer-events: none; opacity: 0; transition: opacity .15s; }
+.groupshot.focus .veil { opacity: 1; }
+.who-card {
+  position: absolute; z-index: 3; width: 270px; pointer-events: none;
+  display: flex; gap: 12px; align-items: center;
+  background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+}
+.who-card[hidden] { display: none; }
+.who-card img { width: 64px; height: 64px; flex: none; border-radius: 50%; object-fit: cover; background: var(--tint); }
+.who-card strong { display: block; font-family: var(--serif); font-size: 1.08rem; color: var(--ink); line-height: 1.25; }
+.who-card span { display: block; font-size: .88rem; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+.who-card em { display: block; font-style: normal; font-size: .84rem; color: var(--accent); margin-top: 3px; }
+.who-card em:empty, .who-card span:empty { display: none; }
+.groupshot-hint { font-size: .9rem; color: var(--muted); margin: 0 0 8px; }
+@media (max-width: 760px) {
+  .who-card { position: static; width: auto; margin-top: 10px; box-shadow: none; }
+}
