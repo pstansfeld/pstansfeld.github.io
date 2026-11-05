@@ -237,10 +237,11 @@ figure a { display: block; }
 
 /* ---------- Find us ---------- */
 .map { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: var(--radius); background: var(--tint); }
-.address { font-size: 1.15rem; margin: 0; }
-.findus { display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center; margin: 0 0 32px; }
-.findus figure { margin: 0; }
-.findus img { width: 100%; max-width: 474px; height: auto; }
+.address { font-size: 1.15rem; margin: 0 0 24px; }
+.photo { margin: 0 0 32px; }
+.photo img { border: 0; }
+.photo figcaption { font-size: .85rem; color: var(--muted); margin-top: 6px; text-align: right; }
+.photo figcaption a { display: inline; }
 
 /* ---------- Footer ---------- */
 .site-footer { background: var(--footer); color: rgba(255,255,255,.85); padding: 40px 0; font-size: .95rem; }
@@ -265,7 +266,6 @@ figure a { display: block; }
   .story { margin-bottom: 36px; }
   .story p { font-size: 1rem; }
   .split { grid-template-columns: 1fr; gap: 18px; }
-  .findus { grid-template-columns: 1fr; gap: 18px; }
   .split.flip figure { order: 0; }
   .lead-card img { width: 100%; max-width: 260px; }
   .pi-photo { max-width: 280px; }
