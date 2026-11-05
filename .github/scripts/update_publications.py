@@ -63,14 +63,18 @@ def load_group():
 
 def in_group(last, initials, year):
     """Surname matches and the person's first initial is their first or second initial
-    (covers people who go by a middle name, e.g. C. Keith Cassidy = Cassidy CK)."""
+    (covers people who go by a middle name, e.g. C. Keith Cassidy = Cassidy CK).
+    A double-barrelled surname in PubMed also matches on its last part
+    (e.g. Bunoro-Batista M = Mariana Batista)."""
     if not last or not initials:
         return False
     ini = norm(initials)
-    for k in {ini[:1], ini[1:2]} - {""}:
-        span = GROUP.get((norm(last), k))
-        if span and span[0] <= year <= span[1]:
-            return True
+    surnames = {norm(last), re.split(r"[\s-]+", norm(last))[-1]}
+    for s in surnames:
+        for k in {ini[:1], ini[1:2]} - {""}:
+            span = GROUP.get((s, k))
+            if span and span[0] <= year <= span[1]:
+                return True
     return False
 
 
