@@ -10,6 +10,7 @@ import json
 import re
 import sys
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -18,13 +19,59 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 TERM = "Stansfeld PJ[au]"          # PubMed author search
-ME = "Stansfeld PJ"                # shown in bold in author lists
 MIN_PAPERS = 50                    # refuse to publish a suspiciously short list
 PAGE = Path(__file__).resolve().parents[2] / "group" / "publications.html"
 START, END = "<!-- PUBS:START -->", "<!-- PUBS:END -->"
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
 SKIP_TYPES = {"Published Erratum", "Preprint", "Retraction of Publication", "Expression of Concern"}
 TITLE_TAGS = {"i", "b", "sup", "sub", "u"}
+
+# Group members shown in bold: read from the site's own Members and Alumni pages, so
+# anyone added there is picked up automatically. Key: (surname, first initial) -> years.
+# Alumni count from their start year to four years after they left; current members always.
+GROUP = {("stansfeld", "p"): (0, 9999)}
+
+
+def norm(s):
+    s = unicodedata.normalize("NFKD", html.unescape(s))
+    return "".join(c for c in s if not unicodedata.combining(c)).lower().strip()
+
+
+def _add_person(name, lo, hi):
+    parts = re.sub(r"\(.*?\)", " ", html.unescape(name)).split()
+    if len(parts) < 2:
+        return
+    key = (norm(" ".join(parts[1:])), norm(parts[0])[:1])
+    old = GROUP.get(key)
+    GROUP[key] = (min(lo, old[0]), max(hi, old[1])) if old else (lo, hi)
+
+
+def load_group():
+    site = PAGE.parent
+    members = (site / "members.html").read_text(encoding="utf-8")
+    for name in re.findall(r"<h3>([^<]+)</h3>", members):
+        _add_person(name, 0, 9999)
+    alumni = (site / "alumni.html").read_text(encoding="utf-8")
+    for block in re.findall(r'<article class="alum">(.*?)</article>', alumni, re.S):
+        name = re.search(r"<h3>([^<]+)</h3>", block)
+        dates = re.search(r'<p class="dates">([^<]*)</p>', block)
+        years = [int(y) for y in re.findall(r"\d{4}", dates.group(1) if dates else "")]
+        if name:
+            _add_person(name.group(1), *((min(years), max(years) + 4) if years else (0, 9999)))
+    print(f"Bolding {len(GROUP)} group members")
+
+
+def in_group(last, initials, year):
+    """Surname matches and the person's first initial is their first or second initial
+    (covers people who go by a middle name, e.g. C. Keith Cassidy = Cassidy CK)."""
+    if not last or not initials:
+        return False
+    ini = norm(initials)
+    for k in {ini[:1], ini[1:2]} - {""}:
+        span = GROUP.get((norm(last), k))
+        if span and span[0] <= year <= span[1]:
+            return True
+    return False
 
 
 def eutils(endpoint, **params):
@@ -73,24 +120,29 @@ def txt(el, path):
     return (found.text or "").strip() if found is not None and found.text else ""
 
 
-def authors(art):
-    names = []
+def authors(art, year):
+    names = []  # (shown as, surname, initials)
     for a in art.findall("AuthorList/Author"):
         if txt(a, "LastName"):
-            names.append(f"{txt(a, 'LastName')} {txt(a, 'Initials')}".strip())
+            names.append((f"{txt(a, 'LastName')} {txt(a, 'Initials')}".strip(), txt(a, "LastName"), txt(a, "Initials")))
         elif txt(a, "CollectiveName"):
-            names.append(txt(a, "CollectiveName"))
-    return format_authors(names)
+            names.append((txt(a, "CollectiveName"), "", ""))
+    return format_authors(names, year)
 
 
-def format_authors(names):
-    if len(names) > 25:  # long consortium lists: first ten, the PI, last author
-        short = names[:10] + ["…"]
-        if ME in names[10:-1]:
-            short += [ME, "…"]
-        names = short + names[-1:]
-    s = html.escape(", ".join(names).replace(", …,", " …").replace(", …", " …"), quote=False)
-    return s.replace(ME, f"<b>{ME}</b>")
+def format_authors(names, year):
+    bold = [in_group(last, ini, year) for _, last, ini in names]
+    keep = range(len(names))
+    if len(names) > 25:  # long consortium lists: first ten, group members, last author
+        keep = sorted(set(range(10)) | {k for k, b in enumerate(bold) if b} | {len(names) - 1})
+    out, prev = [], -1
+    for k in keep:
+        if k != prev + 1:
+            out.append("…")
+        shown = html.escape(names[k][0], quote=False)
+        out.append(f"<b>{shown}</b>" if bold[k] else shown)
+        prev = k
+    return ", ".join(out).replace(", …, ", " … ")
 
 
 def parse(xml_text):
@@ -128,7 +180,7 @@ def parse(xml_text):
         pmid = txt(mc, "PMID")
         url = f"https://doi.org/{doi}" if doi else f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
         papers.append({
-            "pmid": int(pmid), "year": int(year), "title": title, "authors": authors(art),
+            "pmid": int(pmid), "year": int(year), "title": title, "authors": authors(art, int(year)),
             "journal": html.escape(txt(art, "Journal/ISOAbbreviation") or txt(art, "Journal/Title"), quote=False),
             "details": html.escape(details, quote=False), "url": html.escape(url),
         })
@@ -219,6 +271,13 @@ def epmc_get(params):
             time.sleep(10 * (attempt + 1))
 
 
+def _split_name(s):
+    """'Corey RA' -> ('Corey RA', 'Corey', 'RA')."""
+    s = s.strip()
+    m = re.match(r"(.+?)\s+([A-Z]{1,4})$", s)
+    return (s, m.group(1), m.group(2)) if m else (s, "", "")
+
+
 def epmc_papers():
     results, cursor = [], "*"
     while True:
@@ -245,13 +304,13 @@ def epmc_papers():
         names = []
         for a in (r.get("authorList", {}) or {}).get("author", []) or []:
             if a.get("lastName"):
-                names.append(f"{a['lastName']} {a.get('initials', '')}".strip())
+                names.append((f"{a['lastName']} {a.get('initials', '')}".strip(), a["lastName"], a.get("initials", "")))
             elif a.get("collectiveName"):
-                names.append(a["collectiveName"])
+                names.append((a["collectiveName"], "", ""))
             elif a.get("fullName"):
-                names.append(a["fullName"])
+                names.append(_split_name(a["fullName"]))
         if not names and r.get("authorString"):
-            names = [n.strip() for n in r["authorString"].rstrip(".").split(",")]
+            names = [_split_name(n) for n in r["authorString"].rstrip(".").split(",") if n.strip()]
         details = year
         if ji.get("volume"):
             details += f";{ji['volume']}" + (f"({ji['issue']})" if ji.get("issue") else "")
@@ -261,7 +320,7 @@ def epmc_papers():
         url = f"https://doi.org/{doi}" if doi else f"https://pubmed.ncbi.nlm.nih.gov/{r['pmid']}/"
         journal = j.get("isoabbreviation") or j.get("ISOAbbreviation") or j.get("medlineAbbreviation") or j.get("title") or ""
         papers.append({
-            "pmid": int(r["pmid"]), "year": int(year), "title": title, "authors": format_authors(names),
+            "pmid": int(r["pmid"]), "year": int(year), "title": title, "authors": format_authors(names, int(year)),
             "journal": html.escape(journal, quote=False), "details": html.escape(details, quote=False),
             "url": html.escape(url),
         })
@@ -275,6 +334,7 @@ def pubmed_papers():
 
 
 def main():
+    load_group()
     try:
         papers, source = pubmed_papers(), "PubMed"
     except Exception as e:
