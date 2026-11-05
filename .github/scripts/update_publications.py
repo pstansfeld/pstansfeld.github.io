@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh group/publications.html from PubMed.
+"""Refresh group/publications.html from PubMed (or Europe PMC if PubMed is down).
 
 Run weekly by .github/workflows/update-publications.yml. Replaces everything
 between the PUBS:START and PUBS:END markers in the page; the rest of the page
@@ -14,6 +14,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import date
+from html.parser import HTMLParser
 from pathlib import Path
 
 TERM = "Stansfeld PJ[au]"          # PubMed author search
@@ -79,6 +80,10 @@ def authors(art):
             names.append(f"{txt(a, 'LastName')} {txt(a, 'Initials')}".strip())
         elif txt(a, "CollectiveName"):
             names.append(txt(a, "CollectiveName"))
+    return format_authors(names)
+
+
+def format_authors(names):
     if len(names) > 25:  # long consortium lists: first ten, the PI, last author
         short = names[:10] + ["…"]
         if ME in names[10:-1]:
@@ -166,11 +171,115 @@ def update_page(page_html, papers, today=None):
     return head + block + tail
 
 
-def main():
+# ---------------------------------------------------------------- Europe PMC fallback
+# Europe PMC mirrors PubMed (SRC:MED) on separate servers, used if NCBI is unavailable.
+EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+EPMC_QUERY = 'AUTH:"Stansfeld PJ" AND SRC:MED'
+
+
+class _TitleCleaner(HTMLParser):
+    """Keep only simple inline formatting from an HTML-ish title string."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.out = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in TITLE_TAGS:
+            self.out.append(f"<{tag}>")
+
+    def handle_endtag(self, tag):
+        if tag in TITLE_TAGS:
+            self.out.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        self.out.append(html.escape(data, quote=False))
+
+
+def clean_title(s):
+    p = _TitleCleaner()
+    p.feed(s or "")
+    p.close()
+    return re.sub(r"\s+", " ", "".join(p.out)).strip().rstrip(".")
+
+
+def epmc_get(params):
+    url = EPMC + "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"User-Agent": "stansfeld-group-site (+https://pstansfeld.github.io/group/)"})
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=90) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except Exception as e:
+            print(f"  Europe PMC attempt {attempt + 1} failed: {e}", file=sys.stderr)
+            if attempt == 3:
+                raise
+            time.sleep(10 * (attempt + 1))
+
+
+def epmc_papers():
+    results, cursor = [], "*"
+    while True:
+        data = epmc_get({"query": EPMC_QUERY, "resultType": "core", "format": "json",
+                         "pageSize": 1000, "cursorMark": cursor})
+        batch = data.get("resultList", {}).get("result", [])
+        results += batch
+        nxt = data.get("nextCursorMark")
+        if not batch or not nxt or nxt == cursor:
+            break
+        cursor = nxt
+    print(f"Europe PMC returned {len(results)} records (hitCount {data.get('hitCount')})")
+    papers = []
+    for r in results:
+        types = set(r.get("pubTypeList", {}).get("pubType", []) or [])
+        if types & SKIP_TYPES or not r.get("pmid"):
+            continue
+        title = clean_title(r.get("title"))
+        ji = r.get("journalInfo", {}) or {}
+        j = ji.get("journal", {}) or {}
+        year = str(r.get("pubYear") or ji.get("yearOfPublication") or "")
+        if not title or not year.isdigit():
+            continue
+        names = []
+        for a in (r.get("authorList", {}) or {}).get("author", []) or []:
+            if a.get("lastName"):
+                names.append(f"{a['lastName']} {a.get('initials', '')}".strip())
+            elif a.get("collectiveName"):
+                names.append(a["collectiveName"])
+            elif a.get("fullName"):
+                names.append(a["fullName"])
+        if not names and r.get("authorString"):
+            names = [n.strip() for n in r["authorString"].rstrip(".").split(",")]
+        details = year
+        if ji.get("volume"):
+            details += f";{ji['volume']}" + (f"({ji['issue']})" if ji.get("issue") else "")
+        if r.get("pageInfo"):
+            details += f":{r['pageInfo']}"
+        doi = r.get("doi", "")
+        url = f"https://doi.org/{doi}" if doi else f"https://pubmed.ncbi.nlm.nih.gov/{r['pmid']}/"
+        journal = j.get("isoabbreviation") or j.get("ISOAbbreviation") or j.get("medlineAbbreviation") or j.get("title") or ""
+        papers.append({
+            "pmid": int(r["pmid"]), "year": int(year), "title": title, "authors": format_authors(names),
+            "journal": html.escape(journal, quote=False), "details": html.escape(details, quote=False),
+            "url": html.escape(url),
+        })
+    return papers
+
+
+def pubmed_papers():
     ids = fetch_ids()
     print(f"PubMed returned {len(ids)} records for {TERM!r}")
-    papers = [p for chunk in fetch_records(ids) for p in parse(chunk)]
+    return [p for chunk in fetch_records(ids) for p in parse(chunk)]
+
+
+def main():
+    try:
+        papers = pubmed_papers()
+    except Exception as e:
+        print(f"PubMed unavailable ({e}); falling back to Europe PMC", file=sys.stderr)
+        papers = epmc_papers()
     print(f"Kept {len(papers)} papers")
+    for p in sorted(papers, key=lambda p: p["pmid"], reverse=True)[:3]:
+        print(f"  e.g. {p['year']} {p['journal']} {p['details']} | {p['title'][:90]}")
     if len(papers) < MIN_PAPERS:
         raise SystemExit(f"Only {len(papers)} papers found (expected at least {MIN_PAPERS}); leaving the page unchanged.")
     PAGE.write_text(update_page(PAGE.read_text(encoding="utf-8"), papers), encoding="utf-8")
