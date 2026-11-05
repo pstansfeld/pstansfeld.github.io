@@ -61,6 +61,7 @@
           <p>In 2019, Phill moved to the <a href="https://warwick.ac.uk">University of Warwick</a>, taking up an Associate Professorship at Reader level, held jointly between the <a href="https://warwick.ac.uk/fac/sci/lifesci/">School of Life Sciences</a> and <a href="https://warwick.ac.uk/fac/sci/chemistry">Department of Chemistry</a>.</p>
           <p>In 2022, Phill was promoted to Full Professor and became a Co-Director of the Howard Dalton Centre for Translational Mechanistic Enzymology.</p>
           <p>For further information see: <a href="https://warwick.ac.uk/fac/sci/lifesci/people/pstansfeld/">warwick.ac.uk/fac/sci/lifesci/people/pstansfeld</a></p>
+          <p>Email: <a class="email" href="#" data-u="dlefsnats.pillihp" data-d="ku.ca.kciwraw">shown when JavaScript is on</a></p>
           <ul class="links">
             <li><a href="https://bsky.app/profile/pstansfeld.bsky.social">Bluesky</a></li>
             <li><a href="https://scholar.google.co.uk/citations?user=xocknVQAAAAJ">Google Scholar</a></li>
@@ -95,6 +96,13 @@
       </div>
     </div>
   </footer>
-
+  <script>
+  // The address is stored reversed and assembled here, so most spam harvesters never see it.
+  document.querySelectorAll('a.email').forEach(function (a) {
+    var r = function (s) { return s.split('').reverse().join(''); };
+    var addr = r(a.dataset.u) + '@' + r(a.dataset.d);
+    a.href = 'mailto:' + addr; a.textContent = addr;
+  });
+  </script>
 </body>
 </html>
