@@ -110,6 +110,8 @@ def parse(xml_text):
         if not year:
             continue
         vol, issue, pages = txt(ji, "Volume"), txt(ji, "Issue"), txt(art, "Pagination/MedlinePgn")
+        if re.match(r"S\d{4}-", pages):  # Elsevier PII code, not page numbers
+            pages = ""
         details = year
         if vol:
             details += f";{vol}" + (f"({issue})" if issue else "")
@@ -155,13 +157,14 @@ def render(papers):
     return "\n".join(lines)
 
 
-def update_page(page_html, papers, today=None):
+def update_page(page_html, papers, today=None, source="PubMed"):
     today = today or date.today()
     if START not in page_html or END not in page_html:
         raise SystemExit(f"Markers {START} / {END} not found in {PAGE}")
+    link = (f"https://pubmed.ncbi.nlm.nih.gov/?term={urllib.parse.quote(TERM)}" if source == "PubMed"
+            else f"https://europepmc.org/search?query={urllib.parse.quote(EPMC_QUERY)}")
     stamp = (f'<p class="updated">{len(papers)} papers · checked against '
-             f'<a href="https://pubmed.ncbi.nlm.nih.gov/?term={urllib.parse.quote(TERM)}">PubMed</a> '
-             f'on {today.day} {today:%B %Y}</p>')
+             f'<a href="{link}">{source}</a> on {today.day} {today:%B %Y}</p>')
     block = f"{START}\n{stamp}\n{render(papers)}\n{END}"
     head, rest = page_html.split(START, 1)
     _, tail = rest.split(END, 1)
@@ -197,7 +200,7 @@ class _TitleCleaner(HTMLParser):
 
 def clean_title(s):
     p = _TitleCleaner()
-    p.feed(s or "")
+    p.feed(html.unescape(s or ""))  # Europe PMC sends inline tags escaped (&lt;i&gt;)
     p.close()
     return re.sub(r"\s+", " ", "".join(p.out)).strip().rstrip(".")
 
@@ -252,7 +255,7 @@ def epmc_papers():
         details = year
         if ji.get("volume"):
             details += f";{ji['volume']}" + (f"({ji['issue']})" if ji.get("issue") else "")
-        if r.get("pageInfo"):
+        if r.get("pageInfo") and not re.match(r"S\d{4}-", r["pageInfo"]):  # skip Elsevier PII codes
             details += f":{r['pageInfo']}"
         doi = r.get("doi", "")
         url = f"https://doi.org/{doi}" if doi else f"https://pubmed.ncbi.nlm.nih.gov/{r['pmid']}/"
@@ -273,16 +276,16 @@ def pubmed_papers():
 
 def main():
     try:
-        papers = pubmed_papers()
+        papers, source = pubmed_papers(), "PubMed"
     except Exception as e:
-        print(f"PubMed unavailable ({e}); falling back to Europe PMC", file=sys.stderr)
-        papers = epmc_papers()
+        print(f"PubMed unavailable ({e!r}); falling back to Europe PMC", file=sys.stderr)
+        papers, source = epmc_papers(), "Europe PMC"
     print(f"Kept {len(papers)} papers")
     for p in sorted(papers, key=lambda p: p["pmid"], reverse=True)[:3]:
         print(f"  e.g. {p['year']} {p['journal']} {p['details']} | {p['title'][:90]}")
     if len(papers) < MIN_PAPERS:
         raise SystemExit(f"Only {len(papers)} papers found (expected at least {MIN_PAPERS}); leaving the page unchanged.")
-    PAGE.write_text(update_page(PAGE.read_text(encoding="utf-8"), papers), encoding="utf-8")
+    PAGE.write_text(update_page(PAGE.read_text(encoding="utf-8"), papers, source=source), encoding="utf-8")
     print(f"Wrote {PAGE}")
 
 
