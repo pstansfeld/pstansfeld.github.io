@@ -161,6 +161,7 @@ figure a { display: block; }
   text-decoration: none; font-weight: 600; font-size: .9rem;
 }
 .years a:hover { background: var(--aubergine); color: #fff; }
+.updated { font-size: .9rem; color: var(--muted); margin: 0 0 14px; }
 .pub-year { scroll-margin-top: 70px; font-size: 1.9rem; color: var(--aubergine); margin: 44px 0 14px; }
 .pubs { list-style: none; padding: 0; margin: 0; }
 .pubs li { padding: 14px 0; border-top: 1px solid var(--line); }
