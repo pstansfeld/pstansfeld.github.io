@@ -119,6 +119,36 @@ def inner(el):
     return re.sub(r"\s+", " ", "".join(out)).strip()
 
 
+# Organism names are italicised in titles (PubMed often leaves them plain).
+GENERA = ("Escherichia|Bacillus|Pseudomonas|Staphylococcus|Mycobacterium|Caulobacter|Klebsiella|Acinetobacter|"
+          "Enterococcus|Enterobacter|Salmonella|Vibrio|Helicobacter|Thermus|Streptococcus|Streptomyces|Toxoplasma|"
+          "Plasmodium|Saccharomyces|Neisseria|Shigella|Yersinia|Campylobacter|Clostridioides|Clostridium|Listeria|"
+          "Legionella|Chlamydia|Haemophilus|Bordetella|Aquifex|Thermotoga|Nitrosopumilus|Synechocystis|Deinococcus|"
+          "Borrelia|Bacteroides|Corynebacterium|Xanthomonas|Rhodobacter|Agrobacterium|Serratia|Burkholderia|"
+          "Francisella|Lactococcus|Cronobacter|Proteus|Aeromonas|Myxococcus|Drosophila|Caenorhabditis|Arabidopsis")
+EPITHETS = ("coli|subtilis|aeruginosa|aureus|tuberculosis|smegmatis|marinum|crescentus|pneumoniae|baumannii|faecium|"
+            "faecalis|cloacae|cholerae|pylori|thermophilus|gondii|falciparum|cerevisiae|enterica|jejuni|meningitidis|"
+            "gonorrhoeae|influenzae|monocytogenes|pneumophila|trachomatis|difficile|maritimus|aeolicus|maritima|"
+            "radiodurans|burgdorferi|sphaeroides|tumefaciens|marcescens|cepacia|tularensis|lactis|fragilis|glutamicum|"
+            "coelicolor|pyogenes|sakazakii|mirabilis|xanthus|melanogaster|elegans|thaliana")
+_FULL = re.compile(rf"\b(?:{GENERA})(?:\s+(?:{EPITHETS}))?\b")
+_ABBR = re.compile(rf"\b[A-Z]\.\s?(?:{EPITHETS})\b")
+
+
+def italicise(title_html):
+    """Wrap organism names in <i>, leaving text that is already italic alone."""
+    out, depth = [], 0
+    for tok in re.split(r"(<[^>]+>)", title_html):
+        if tok.startswith("<"):
+            depth += 1 if tok == "<i>" else -1 if tok == "</i>" else 0
+        elif depth == 0 and tok:
+            tok = _FULL.sub(lambda m: f"<i>{m.group(0)}</i>", tok)
+            tok = re.sub(r"(<i>.*?</i>)|" + _ABBR.pattern,
+                         lambda m: m.group(1) or f"<i>{m.group(0)}</i>", tok)
+        out.append(tok)
+    return "".join(out)
+
+
 def txt(el, path):
     found = el.find(path)
     return (found.text or "").strip() if found is not None and found.text else ""
@@ -157,7 +187,7 @@ def parse(xml_text):
         types = {t.text for t in art.findall("PublicationTypeList/PublicationType")}
         if types & SKIP_TYPES:
             continue
-        title = inner(art.find("ArticleTitle")).rstrip(".")
+        title = italicise(inner(art.find("ArticleTitle")).rstrip("."))
         if not title:
             continue
         ji = art.find("Journal/JournalIssue")
@@ -299,7 +329,7 @@ def epmc_papers():
         types = set(r.get("pubTypeList", {}).get("pubType", []) or [])
         if types & SKIP_TYPES or not r.get("pmid"):
             continue
-        title = clean_title(r.get("title"))
+        title = italicise(clean_title(r.get("title")))
         ji = r.get("journalInfo", {}) or {}
         j = ji.get("journal", {}) or {}
         year = str(r.get("pubYear") or ji.get("yearOfPublication") or "")
