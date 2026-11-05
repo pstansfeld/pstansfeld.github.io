@@ -1,8 +1,9 @@
 name: Update publications
 
 # Refreshes group/publications.html from PubMed every Monday.
-# Also runs when this workflow or its script changes, or on demand
-# from the Actions tab ("Run workflow").
+# Also runs when this workflow, its script, or the Members/Alumni pages
+# (whose names are shown in bold) change, or on demand from the Actions
+# tab ("Run workflow").
 on:
   schedule:
     - cron: "17 4 * * 1"
@@ -12,6 +13,8 @@ on:
     paths:
       - .github/workflows/update-publications.yml
       - .github/scripts/update_publications.py
+      - group/members.html
+      - group/alumni.html
 
 permissions:
   contents: write
