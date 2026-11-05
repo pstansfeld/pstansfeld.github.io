@@ -46,23 +46,68 @@
   <main id="content">
     <div class="wrap">
       <h1>Welcome</h1>
-      <p class="lede">Thank you for visiting the Stansfeld Research Group’s website.</p>
+      <p class="lede">We use computer simulation and AI structure prediction to bring membrane proteins to life, with a particular focus on how bacteria build their cell envelope and resist antibiotics.</p>
       <section class="story">
-        <p>We are studying one of the fundamental challenges in biological sciences: to visualise biomolecular machines in high-resolution detail. This is notoriously difficult, expensive and time-consuming to achieve by using experimental techniques, especially for proteins that exist in cell membranes, known as Integral membrane proteins (IMPs). These proteins play fundamental roles in cell biology e.g. as processing enzymes, ion channels, drug receptors, and solute transporters.</p>
-        <figure><img src="images/2020/02/pipeline.png" alt="Computational pipeline for membrane protein structures" loading="lazy"></figure>
+        <p>Membrane proteins are the cell’s gatekeepers, enzymes, channels and drug targets, yet they are among the hardest molecules to study experimentally. We combine AI-based structure prediction with multiscale molecular dynamics simulations to model membrane proteins and their complexes in realistic membranes, and to watch how they move and interact with lipids, drugs and each other. Much of this work is done together with experimental colleagues in structural biology, microbiology and chemistry.</p>
+        <figure class="photo">
+          <img src="images/2023/05/elongasome-hero.jpg" width="1296" height="733" alt="Model of the bacterial elongasome complex">
+          <figcaption>The elongasome, the protein machinery that builds the bacterial cell wall</figcaption>
+        </figure>
       </section>
+
+      <h2 class="section-title">Our research</h2>
+      <div class="cards themes">
+        <div class="card">
+          <h3>Membrane protein complexes</h3>
+          <p>We predict how membrane proteins assemble using AI co-folding, then place and simulate the complexes in membranes with our own tools, MemPrO and CCD2MD.</p>
+          <a class="go" href="complexes.html">Explore every membrane complex in <i>E. coli</i> →</a>
+        </div>
+        <div class="card">
+          <h3>The bacterial cell envelope</h3>
+          <p>How bacteria build and maintain their protective outer layers: lipopolysaccharide and phospholipid transport, outer-membrane assembly, peptidoglycan cell-wall synthesis and the mycobacterial cell wall.</p>
+        </div>
+        <div class="card">
+          <h3>Antibiotics and resistance</h3>
+          <p>How bacteria resist last-line antibiotics such as polymyxins, and helping to design new antimicrobials and peptide binders, including bicyclic peptides with Bicycle Therapeutics.</p>
+        </div>
+        <div class="card">
+          <h3>Lipids and membranes</h3>
+          <p>Simulations that reveal how lipids bind to and regulate membrane proteins, and how proteins shape the membranes around them, supported by open tools such as PyLipID and LipIDens.</p>
+          <a class="go" href="research-tools.html">Our research tools →</a>
+        </div>
+      </div>
+
+      <h2 class="section-title">How we work</h2>
       <section class="story">
-        <p>The Stansfeld group uses computational methods to study IMP structures, in particular we use multi-scale molecular dynamics (MD) simulations to permit the accurate assembly of an IMP into a membrane at the coarse-grain level, prior to careful assessment of the quality of the IMP structure at atomic resolution. This workflow forms a springboard to studying the dynamics of experimentally solved structures through MD simulations.</p>
+        <p>We use multiscale molecular dynamics (MD) simulations to assemble a membrane protein into a membrane at the coarse-grained level, before careful assessment of its structure at atomic resolution. This workflow forms a springboard to studying the dynamics of experimentally solved and predicted structures through MD simulations.</p>
         <figure><img src="images/2020/02/memprotmd-workflow.png" alt="MemProtMD multiscale simulation workflow" loading="lazy"></figure>
       </section>
-      <section class="story split">
-        <div><p>With the increasing threat of anti-microbial resistance, we are especially interested in bacterial IMPs. Knowledge of the three-dimensional structures of proteins involved in essential processes provides the physical details of potentially viable targets for killing drug-resistant, pathogenic bacteria. By breathing life into these frozen structures we may assess the association of proteins with lipids, drug molecules and other components of the protein complexes.</p></div>
-        <figure><img src="images/2020/02/systems.png" alt="Examples of simulated bacterial membrane protein systems" loading="lazy"></figure>
-      </section>
       <section class="story split flip">
-        <div><p>We also maintain a pipeline for inserting experimentally-solved IMP structures into their native bilayer environment, <a href="http://memprotmd.bioch.ox.ac.uk">MemProtMD</a>. This pipeline permits the analysis of stability, dynamics and resultant lipid interactions with the experimentally determined IMP structures.</p></div>
+        <div><p>We also maintain <a href="http://memprotmd.bioch.ox.ac.uk">MemProtMD</a>, a pipeline and database that inserts experimentally solved membrane protein structures into their native bilayer environment. It allows the stability, dynamics and lipid interactions of every structure to be analysed.</p></div>
         <figure><a href="http://memprotmd.bioch.ox.ac.uk"><img src="images/2020/02/memprotmd-1.png" alt="MemProtMD database" loading="lazy"></a></figure>
       </section>
+
+      <h2 class="section-title">Latest papers</h2>
+      <!-- LATEST:START -->
+      <ol class="pubs">
+        <li>
+          <a class="t" href="https://doi.org/10.1016/j.bpj.2026.10.020">Computational modelling of toroidal membranes at division and fission sites</a>
+          <p class="a">Graham CLB, <b>Parrag M</b>, <b>Stansfeld PJ</b>, Rodrigues CDA</p>
+          <p class="j"><em>Biophys J</em> 2026</p>
+        </li>
+        <li>
+          <a class="t" href="https://doi.org/10.1007/s00018-026-06329-4">Membrane orientation regulates GAPR-1 oligomerization that is suitable for interaction with beclin 1</a>
+          <p class="a">Shen Z, <b>Corey RA</b>, van Doorne H, Verhoek I, Koopman R, Huitema DS, Sardana S, Baggelaar MP, <b>Stansfeld PJ</b>, Kaloyanova DV, Helms JB</p>
+          <p class="j"><em>Cell Mol Life Sci</em> 2026;83(1)</p>
+        </li>
+        <li>
+          <a class="t" href="https://doi.org/10.1126/sciadv.aeb8889">Diverse ancestral myosin motors generate and segregate distinct types of nanocluster-rich domains at the plasma membrane</a>
+          <p class="a">Sil P, van Zanten TS, Jahnavi S, Bansal A, <b>Razmazma H</b>, Saha S, Mahajan B, Kumar M, <b>Stansfeld PJ</b>, Singh PP, Rao M, Mayor S</p>
+          <p class="j"><em>Sci Adv</em> 2026;12(37):eaeb8889</p>
+        </li>
+      </ol>
+      <!-- LATEST:END -->
+      <p class="see-all"><a href="publications.html">All publications →</a></p>
 
       <div class="explore">
         <a href="members.html"><strong>Meet the team</strong><span>PDRAs, PhD and project students</span></a>

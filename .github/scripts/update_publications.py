@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Refresh publications.html from PubMed (or Europe PMC if PubMed is down).
+"""Refresh publications.html (and the home page's "Latest papers") from PubMed
+(or Europe PMC if PubMed is down).
 
 Run weekly by .github/workflows/update-publications.yml. Replaces everything
 between the PUBS:START and PUBS:END markers in the page; the rest of the page
@@ -22,6 +23,8 @@ TERM = "Stansfeld PJ[au]"          # PubMed author search
 MIN_PAPERS = 50                    # refuse to publish a suspiciously short list
 PAGE = Path(__file__).resolve().parents[2] / "publications.html"
 START, END = "<!-- PUBS:START -->", "<!-- PUBS:END -->"
+HOME = PAGE.parent / "index.html"
+HOME_START, HOME_END = "<!-- LATEST:START -->", "<!-- LATEST:END -->"
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
 SKIP_TYPES = {"Published Erratum", "Preprint", "Retraction of Publication", "Expression of Concern"}
 TITLE_TAGS = {"i", "b", "sup", "sub", "u"}
@@ -221,6 +224,33 @@ def parse(xml_text):
     return papers
 
 
+def render_item(p):
+    return [
+        "  <li>",
+        f'    <a class="t" href="{p["url"]}">{p["title"]}</a>',
+        f'    <p class="a">{p["authors"]}</p>',
+        f'    <p class="j"><em>{p["journal"]}</em> {p["details"]}</p>',
+        "  </li>",
+    ]
+
+
+def replace_block(page_html, start, end, block):
+    """Swap the text between two marker comments, keeping the page's indentation."""
+    head, rest = page_html.split(start, 1)
+    _, tail = rest.split(end, 1)
+    indent = re.search(r"[ \t]*$", head).group(0)
+    return head + f"{start}\n{block}\n{end}".replace("\n", "\n" + indent) + tail
+
+
+def update_home(page_html, papers, n=3):
+    """The home page's "Latest papers" list: the n newest papers."""
+    if HOME_START not in page_html or HOME_END not in page_html:
+        return page_html
+    newest = sorted(papers, key=lambda p: (p["year"], p["pmid"]), reverse=True)[:n]
+    block = "\n".join(['<ol class="pubs">'] + [l for p in newest for l in render_item(p)] + ["</ol>"])
+    return replace_block(page_html, HOME_START, HOME_END, block)
+
+
 def render(papers):
     by_year = {}
     for p in sorted(papers, key=lambda p: (p["year"], p["pmid"]), reverse=True):
@@ -232,13 +262,7 @@ def render(papers):
         lines.append(f'<h2 class="pub-year" id="y{y}">{y}</h2>')
         lines.append('<ol class="pubs">')
         for p in ps:
-            lines += [
-                "  <li>",
-                f'    <a class="t" href="{p["url"]}">{p["title"]}</a>',
-                f'    <p class="a">{p["authors"]}</p>',
-                f'    <p class="j"><em>{p["journal"]}</em> {p["details"]}</p>',
-                "  </li>",
-            ]
+            lines += render_item(p)
         lines.append("</ol>")
     return "\n".join(lines)
 
@@ -251,13 +275,7 @@ def update_page(page_html, papers, today=None, source="PubMed"):
             else f"https://europepmc.org/search?query={urllib.parse.quote(EPMC_QUERY)}")
     stamp = (f'<p class="updated">{len(papers)} papers · checked against '
              f'<a href="{link}">{source}</a> on {today.day} {today:%B %Y}</p>')
-    block = f"{START}\n{stamp}\n{render(papers)}\n{END}"
-    head, rest = page_html.split(START, 1)
-    _, tail = rest.split(END, 1)
-    # keep the page's indentation for the block
-    indent = re.search(r"[ \t]*$", head).group(0)
-    block = block.replace("\n", "\n" + indent)
-    return head + block + tail
+    return replace_block(page_html, START, END, f"{stamp}\n{render(papers)}")
 
 
 # ---------------------------------------------------------------- Europe PMC fallback
@@ -380,6 +398,8 @@ def main():
     if len(papers) < MIN_PAPERS:
         raise SystemExit(f"Only {len(papers)} papers found (expected at least {MIN_PAPERS}); leaving the page unchanged.")
     PAGE.write_text(update_page(PAGE.read_text(encoding="utf-8"), papers, source=source), encoding="utf-8")
+    if HOME.exists():
+        HOME.write_text(update_home(HOME.read_text(encoding="utf-8"), papers), encoding="utf-8")
     print(f"Wrote {PAGE}")
 
 
