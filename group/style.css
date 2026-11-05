@@ -38,14 +38,16 @@ h3 { font-size: 1.15rem; margin: 0 0 .25em; }
 /* ---------- Header ---------- */
 .site-header {
   position: relative;
-  background: var(--aubergine-deep) center/cover no-repeat;
+  background: #2b2b2b center/cover no-repeat;
   color: #fff;
 }
 .site-header::before {
   content: "";
   position: absolute; inset: 0;
-  background: linear-gradient(100deg, rgba(36,9,47,.92) 0%, rgba(36,9,47,.7) 45%, rgba(36,9,47,.25) 100%);
+  /* neutral shade behind the title only, so the photo keeps its true colours */
+  background: linear-gradient(90deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.3) 40%, rgba(0,0,0,0) 70%);
 }
+.brand { text-shadow: 0 1px 3px rgba(0,0,0,.45); }
 .site-header .wrap {
   position: relative;
   display: flex; align-items: center; gap: 22px;
@@ -249,6 +251,7 @@ figure a { display: block; }
   body { font-size: 16px; }
   .wrap { padding: 0 16px; }
   .site-header .wrap { padding-top: 30px; padding-bottom: 30px; gap: 14px; }
+  .site-header::before { background: rgba(0,0,0,.45); }
   .brand-logo { width: 64px; height: 64px; padding: 6px; }
   .brand-logo img { max-height: 52px; }
   .brand-tag { font-size: .98rem; }
