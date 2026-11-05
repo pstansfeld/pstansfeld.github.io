@@ -333,3 +333,6 @@ figure a { display: block; }
   .lightbox { padding: 56px 8px; }
   .lb-prev, .lb-next { top: auto; bottom: 10px; transform: none; }
 }
+.pubs .x { margin: 3px 0 0; font-size: .88rem; }
+.pubs .x a { font-weight: 600; text-decoration: none; }
+.pubs .x a:hover { text-decoration: underline; }

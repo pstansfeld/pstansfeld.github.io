@@ -215,23 +215,33 @@ def parse(xml_text):
                 if loc.get("EIdType") == "doi" and loc.text:
                     doi = loc.text.strip()
         pmid = txt(mc, "PMID")
+        pmcid = next((aid.text.strip() for aid in pa.findall("PubmedData/ArticleIdList/ArticleId")
+                      if aid.get("IdType") == "pmc" and aid.text), "")
         url = f"https://doi.org/{doi}" if doi else f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
         papers.append({
             "pmid": int(pmid), "year": int(year), "title": title, "authors": authors(art, int(year)),
             "journal": html.escape(txt(art, "Journal/ISOAbbreviation") or txt(art, "Journal/Title"), quote=False),
-            "details": html.escape(details, quote=False), "url": html.escape(url),
+            "details": html.escape(details, quote=False), "url": html.escape(url), "pmcid": pmc_id(pmcid),
         })
     return papers
 
 
+def pmc_id(s):
+    """'PMC1234567' (or '') from whatever form the source gives."""
+    m = re.search(r"PMC\d+", s or "", re.I)
+    return m.group(0).upper() if m else ""
+
+
 def render_item(p):
-    return [
+    lines = [
         "  <li>",
         f'    <a class="t" href="{p["url"]}">{p["title"]}</a>',
         f'    <p class="a">{p["authors"]}</p>',
         f'    <p class="j"><em>{p["journal"]}</em> {p["details"]}</p>',
-        "  </li>",
     ]
+    if p.get("pmcid"):  # free full text in PubMed Central
+        lines.append(f'    <p class="x"><a href="https://pmc.ncbi.nlm.nih.gov/articles/{p["pmcid"]}/">Free full text (PMC)</a></p>')
+    return lines + ["  </li>"]
 
 
 def replace_block(page_html, start, end, block):
@@ -374,7 +384,7 @@ def epmc_papers():
         papers.append({
             "pmid": int(r["pmid"]), "year": int(year), "title": title, "authors": format_authors(names, int(year)),
             "journal": html.escape(journal, quote=False), "details": html.escape(details, quote=False),
-            "url": html.escape(url),
+            "url": html.escape(url), "pmcid": pmc_id(r.get("pmcid", "")),
         })
     return papers
 
