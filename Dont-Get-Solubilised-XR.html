@@ -1,0 +1,1297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Don't Get Solubilised XR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Permanent+Marker&display=swap">
+<style>
+/* Layout: the 3D scene fills the window; a single marker-pen card sits over it until you enter the headset. Single light theme to match the cartoon. */
+:root{
+  --paper:#e9ebe4;
+  --card:#f8f8f4;
+  --ink:#1b1d1a;
+  --leaf:#4f9a17;
+  --muted:#5d645a;
+  --font-display:"Permanent Marker","Marker Felt","Comic Sans MS",cursive;
+  --font-body:"Patrick Hand","Chalkboard SE","Comic Sans MS",cursive;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:18px;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#overlay{position:fixed;inset:0;display:grid;place-items:center;padding-block:16px;padding-inline:16px;background:rgba(233,235,228,.6)}
+.card{width:100%;max-width:520px;max-height:100%;overflow:auto;background:var(--card);border:3px solid var(--ink);border-radius:18px 24px 16px 22px / 22px 16px 24px 18px;box-shadow:6px 6px 0 var(--ink);padding:22px;display:flex;flex-direction:column;gap:12px}
+h1{font-family:var(--font-display);font-weight:400;font-size:clamp(28px,6vw,40px);line-height:1.05;margin:0;text-wrap:balance}
+p{margin:0;line-height:1.3;max-width:60ch}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{font-family:var(--font-display);font-size:21px;color:#fff;background:var(--leaf);border:3px solid var(--ink);border-radius:14px 18px 12px 16px;box-shadow:4px 4px 0 var(--ink);padding:7px 22px;cursor:pointer}
+.btn.ghost{background:var(--card);color:var(--ink);font-size:18px}
+.btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink)}
+.btn:focus-visible{outline:3px solid var(--leaf);outline-offset:3px}
+#status{font-size:16px;color:var(--muted)}
+#reopen{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:16px;font-size:16px;padding:4px 14px}
+@media (prefers-reduced-motion:reduce){.btn:active{transform:none}}
+</style>
+
+<div id="overlay">
+  <div class="card" role="dialog" aria-labelledby="ttl">
+    <h1 id="ttl">Don't Get Solubilised XR</h1>
+    <p>Mr Membrane Protein appears on the table in front of you. Grab solutes and ions and feed them to him, swat the detergents, poke helpful lipids in the membrane and pull baddies off his legs.</p>
+    <div class="row">
+      <button id="btnAR" class="btn" hidden>Enter mixed reality</button>
+      <button id="btnVR" class="btn" hidden>Enter VR</button>
+      <button id="btnMouse" class="btn ghost">Try it with the mouse</button>
+    </div>
+    <p id="status">Checking for a headset…</p>
+  </div>
+</div>
+<button id="reopen" class="btn ghost" hidden>Headset options</button>
+
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ======================================================================================
+   TUNING — the numbers most likely to need a nudge after the first try on the Quest 3.
+   Distances are in metres. The membrane is built around its own centre (0,0,0).
+   ====================================================================================== */
+const TUNE = {
+  eyeDrop: 0.42,       // when placed, the membrane sits this far below your eyes
+  distance: 0.50,      // ...and this far in front of you
+  grabRadius: 0.085,   // pinch / trigger grabs anything this close to your fingers
+  hitRadius: 0.03,     // swatting reach of fingertips and controllers
+  feedRadius: 0.11,    // a held solute this close to his head gets swallowed
+  pullDistance: 0.07,  // drag a stuck baddie this far to rip it off
+  roundSeconds: 120,   // one outreach round
+  fallSpeed: 0.055,    // solutes and ions drift down this fast (m/s)
+  foeSpeed: 0.05,      // baddies swim this fast (m/s), before difficulty scaling
+  itemScale: 1.35,     // size of solutes, ions and baddies (1 = true cartoon scale)
+};
+// Difficulty: how many baddies, how fast, and when (seconds into the round) each thing first appears
+const MODES = {
+  easy:   { label: 'Easy',   foe: 0.65, speed: 0.85, intro: { det: 20, chol: 20, pip: 45, gm3: 45, amp: 70, drug: 70, sma: 95 } },
+  medium: { label: 'Medium', foe: 1.0,  speed: 1.0,  intro: { det: 12, chol: 12, pip: 35, gm3: 35, amp: 55, drug: 55, sma: 80 } },
+  hard:   { label: 'Hard',   foe: 1.5,  speed: 1.2,  intro: { det: 0,  chol: 0,  pip: 20, gm3: 20, amp: 30, drug: 40, sma: 50 } },
+};
+const INTRO_MSG = {
+  det: 'Detergents! Swat them away', chol: 'Poke cholesterol to knock one off', pip: 'PIP₂ knocks off two',
+  gm3: 'GM3 doubles your points', amp: 'Amphipols wrap his legs', drug: 'Drugs plug the pore: pull them out', sma: 'SMA! Swat it fast',
+};
+const WEIGHT = { det: 1, amp: 2, sma: 3 }, MAX_BOUND = 10, BIND_S = 5, PLUG_S = 10, BOOST_S = 8;
+
+// Geometry of the diorama (local metres)
+const MR = 0.36, LEAF = 0.05, HEAD_Y = 0.215, HEAD_R = 0.072, PLUG_Y = 0.11, OUT_Y = -0.13;
+const TAU = Math.PI * 2;
+const COL = { ink: 0x1b1d1a, leaf: 0x4f9a17, tail: 0x6c9bd2, chol: 0xe0262a, pip: 0xf2a23a, pipP: 0xffd84a, lig: 0xffc83a, oxy: 0xe8513a,
+  white: 0xfbfbf7, det: 0xc9a5ca, amp: 0xd4559b, ampD: 0x7a1f4f, sma: 0x8f979e, drug: 0x3b4a8c, na: 0x9ad6e8, cl: 0xa6dd8a,
+  glc: 0x0072bc, gal: 0xffd400, sia: 0xa54399 };
+const CSS = { ink: '#1b1d1a', leaf: '#4f9a17', lipid: '#7aa6da', det: '#c9a5ca', amp: '#d4559b', sma: '#8f979e', lig: '#ffc83a', na: '#9ad6e8',
+  cl: '#a6dd8a', drug: '#3b4a8c', white: '#fbfbf7', paper: '#e9ebe4', card: '#f8f8f4', muted: '#5d645a', chol: '#e0262a', pip: '#f2a23a',
+  sia: '#a54399', tongue: '#e46a6a', ampD: '#9c2f6b', smaD: '#555c62', detD: '#5a4466' };
+const FD = '"Permanent Marker", "Comic Sans MS", cursive', FB = '"Patrick Hand", "Comic Sans MS", cursive';
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const V3 = () => new THREE.Vector3();
+
+/* ---------------- renderer, scene, stage ---------------- */
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local-floor');
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const PAPER = new THREE.Color(0xe9ebe4), VR_SKY = new THREE.Color(0xcfd8de);
+scene.background = PAPER;
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.01, 40);
+const DESK_EYE = new THREE.Vector3(0, 1.56, 0.62), DESK_LOOK = new THREE.Vector3(0, 1.2, -0.5);
+camera.position.copy(DESK_EYE); camera.lookAt(DESK_LOOK);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8d9389, 2.4));
+const sun = new THREE.DirectionalLight(0xffffff, 1.7); sun.position.set(0.5, 1.2, 0.8); scene.add(sun);
+
+const stage = new THREE.Group(); scene.add(stage);
+const DESK_STAGE = new THREE.Vector3(0, 1.0, -0.5);
+stage.position.copy(DESK_STAGE);
+const stageInvQ = new THREE.Quaternion();
+const syncStage = () => { stage.updateMatrixWorld(true); stageInvQ.copy(stage.quaternion).invert(); };
+syncStage();
+const vrFloor = new THREE.Mesh(new THREE.CircleGeometry(3, 48), new THREE.MeshLambertMaterial({ color: 0xb9c2b4 }));
+vrFloor.rotation.x = -Math.PI / 2; vrFloor.visible = false; scene.add(vrFloor);
+
+/* ---------------- materials, geometry, textures ---------------- */
+const gradTex = new THREE.DataTexture(new Uint8Array([110, 185, 255]), 3, 1, THREE.RedFormat);
+gradTex.minFilter = gradTex.magFilter = THREE.NearestFilter; gradTex.generateMipmaps = false; gradTex.needsUpdate = true;
+const MATS = new Map();
+function toon(color, map) {
+  const key = color + '|' + (map ? map.uuid : '');
+  if (!MATS.has(key)) MATS.set(key, new THREE.MeshToonMaterial({ color, gradientMap: gradTex, map: map || null }));
+  return MATS.get(key);
+}
+const INK = new THREE.MeshBasicMaterial({ color: COL.ink, side: THREE.BackSide });
+const INK_SOLID = new THREE.MeshBasicMaterial({ color: COL.ink });
+const GEO = new Map();
+const geo = (key, make) => { if (!GEO.has(key)) GEO.set(key, make()); return GEO.get(key); };
+const sph = (r, w = 18, h = 14) => geo(`s${r}|${w}`, () => new THREE.SphereGeometry(r, w, h));
+const cylG = (r, len, seg = 8) => geo(`c${r}|${len.toFixed(4)}|${seg}`, () => new THREE.CylinderGeometry(r, r, len, seg));
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+function ball(parent, r, color, map, k = 1.15) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(sph(r), toon(map ? 0xffffff : color, map));
+  g.add(body);
+  if (k) g.add(new THREE.Mesh(sph(r * k, 12, 9), INK));
+  g.userData.body = body;
+  if (parent) parent.add(g);
+  return g;
+}
+function stick(parent, a, b, r = 0.0016) {
+  const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+  const m = new THREE.Mesh(cylG(r, len, 5), INK_SOLID);
+  m.position.copy(a).addScaledVector(d, 0.5);
+  m.quaternion.setFromUnitVectors(Y_AXIS, d.normalize());
+  parent.add(m);
+  return m;
+}
+function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function texFrom(c) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+// Faces are painted where a sphere looks along +z (u = 0.25). 1 radian on the sphere ≈ 81 px on this canvas.
+function sphereTex(base, draw, both = false) {
+  const c = makeCanvas(512, 256), g = c.getContext('2d');
+  g.fillStyle = base; g.fillRect(0, 0, 512, 256);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (const cx of both ? [128, 384] : [128]) { g.save(); g.translate(cx, 128); draw(g); g.restore(); }
+  return texFrom(c);
+}
+const arc = (g, x, y, r, a0, a1) => { g.beginPath(); g.arc(x, y, r, a0, a1); g.stroke(); };
+const dotC = (g, x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); };
+
+const TEX = {};
+function buildTextures() {
+  const ink = CSS.ink, PI = Math.PI;
+  // Mr Membrane Protein (same proportions as the 2D game: 1 px there ≈ 1 px here)
+  const eyes = (g, ry = 13) => { g.fillStyle = ink; g.beginPath(); g.ellipse(-27, -18, 6.5, ry, 0, 0, TAU); g.ellipse(27, -18, 6.5, ry, 0, 0, TAU); g.fill(); };
+  const brows = g => { g.strokeStyle = ink; g.lineWidth = 4.5; g.beginPath(); g.moveTo(-42, -37); g.lineTo(-16, -45); g.moveTo(42, -37); g.lineTo(16, -45); g.stroke(); };
+  TEX.happy = sphereTex(CSS.leaf, g => { eyes(g); g.strokeStyle = ink; g.lineWidth = 4.5; arc(g, 0, -6, 48, 0.24 * PI, 0.76 * PI); });
+  TEX.blink = sphereTex(CSS.leaf, g => { eyes(g, 1.6); g.strokeStyle = ink; g.lineWidth = 4.5; arc(g, 0, -6, 48, 0.24 * PI, 0.76 * PI); });
+  TEX.eat = sphereTex(CSS.leaf, g => {
+    eyes(g); g.fillStyle = ink;
+    const mouth = () => { g.beginPath(); g.moveTo(-36, 10); g.quadraticCurveTo(0, 15, 36, 10); g.quadraticCurveTo(30, 54, 0, 54); g.quadraticCurveTo(-30, 54, -36, 10); g.closePath(); };
+    mouth(); g.fill(); g.save(); mouth(); g.clip(); g.fillStyle = CSS.tongue; g.beginPath(); g.ellipse(0, 54, 19, 13, 0, 0, TAU); g.fill(); g.restore();
+  });
+  TEX.worried = sphereTex(CSS.leaf, g => { eyes(g); brows(g); g.strokeStyle = ink; g.lineWidth = 4.5; arc(g, 0, 62, 42, 1.2 * PI, 1.8 * PI); });
+  TEX.sad = sphereTex(CSS.leaf, g => { eyes(g); g.strokeStyle = ink; g.lineWidth = 4.5; arc(g, 0, 62, 42, 1.2 * PI, 1.8 * PI); });
+  TEX.hurt = sphereTex(CSS.leaf, g => {
+    g.strokeStyle = ink; g.lineWidth = 4.5;
+    g.beginPath(); g.moveTo(-37, -29); g.lineTo(-22, -18); g.lineTo(-37, -7); g.moveTo(37, -29); g.lineTo(22, -18); g.lineTo(37, -7); g.stroke();
+    g.beginPath(); for (let i = 0; i <= 24; i++) { const t = i / 24; g.lineTo(-30 + 60 * t, 26 + Math.sin(t * TAU * 2) * 4); } g.stroke();
+  });
+  // Lipid heads (2D faces scaled ×4.8 because the head is smaller)
+  const lip = v => sphereTex(CSS.lipid, g => {
+    g.scale(4.8, 4.8); g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = 1.9;
+    if (v === 1) { g.beginPath(); g.arc(-6.5, -3, 4.8, 0, TAU); g.moveTo(11.3, -3); g.arc(6.5, -3, 4.8, 0, TAU); g.moveTo(-1.7, -3); g.lineTo(1.7, -3); g.stroke(); dotC(g, -6.5, -3, 1.6); dotC(g, 6.5, -3, 1.6); arc(g, 0, 4, 5, 0.18 * PI, 0.82 * PI); }
+    else if (v === 2) { arc(g, -6, -1, 3.3, 1.1 * PI, 1.9 * PI); arc(g, 6, -1, 3.3, 1.1 * PI, 1.9 * PI); arc(g, 0, 1, 8, 0.18 * PI, 0.82 * PI); }
+    else { g.beginPath(); g.ellipse(-6, -3, 2, 3.2, 0, 0, TAU); g.ellipse(6, -3, 2, 3.2, 0, 0, TAU); g.fill(); arc(g, 0, 1, 7, 0.18 * PI, 0.82 * PI); }
+  });
+  TEX.lip = [lip(0), lip(1), lip(2)];
+  // Solute and ions
+  TEX.lig = sphereTex(CSS.lig, g => { g.scale(7.4, 7.4); g.fillStyle = ink; g.strokeStyle = ink; g.lineWidth = 1.8; dotC(g, -3.8, -2, 1.6); dotC(g, 3.8, -2, 1.6); arc(g, 0, 1, 4.6, 0.15 * PI, 0.85 * PI); });
+  const ionTex = (base, label) => sphereTex(base, g => { g.fillStyle = ink; g.font = `64px ${FB}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, 0, 4); }, true);
+  TEX.na = ionTex(CSS.na, 'Na⁺'); TEX.cl = ionTex(CSS.cl, 'Cl⁻');
+  // Baddie heads: front-on angry face with chomping jaws (open / shut)
+  const jaws = (base, open) => sphereTex(base, g => {
+    g.fillStyle = ink; g.strokeStyle = ink;
+    dotC(g, -24, -20, 9); dotC(g, 24, -20, 9); g.fillStyle = '#fff'; dotC(g, -21, -23, 3); dotC(g, 27, -23, 3);
+    g.lineWidth = 8; g.beginPath(); g.moveTo(-46, -46); g.lineTo(-10, -32); g.moveTo(46, -46); g.lineTo(10, -32); g.stroke();
+    const h = open ? 26 : 8;
+    g.fillStyle = ink; g.beginPath(); g.ellipse(0, 28, 46, h, 0, 0, TAU); g.fill();
+    g.fillStyle = '#fff';
+    for (let i = 0; i < 6; i++) {
+      const x = -36 + i * 14.4;
+      g.beginPath(); g.moveTo(x - 6, 28 - h + 2); g.lineTo(x + 6, 28 - h + 2); g.lineTo(x, 28 - h + 14); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(x + 1, 28 + h - 2); g.lineTo(x + 13, 28 + h - 2); g.lineTo(x + 7, 28 + h - 14); g.closePath(); g.fill();
+    }
+  });
+  for (const k of ['det', 'amp', 'sma']) { TEX[k + 'O'] = jaws(CSS[k], true); TEX[k + 'S'] = jaws(CSS[k], false); }
+  // Drug capsule: navy top, white bottom, cross face on the white half (capsule texture runs bottom→top)
+  {
+    const c = makeCanvas(512, 256), g = c.getContext('2d');
+    g.fillStyle = CSS.drug; g.fillRect(0, 0, 512, 128); g.fillStyle = CSS.white; g.fillRect(0, 128, 512, 128);
+    g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(0, 34, 512, 10);
+    g.fillStyle = ink; g.fillRect(0, 124, 512, 8);
+    for (const cx of [0, 512, 256]) {
+      g.save(); g.translate(cx, 186); g.scale(1, 0.62); g.fillStyle = ink; g.strokeStyle = ink; g.lineCap = 'round';
+      dotC(g, -22, -12, 8); dotC(g, 22, -12, 8);
+      g.lineWidth = 7; g.beginPath(); g.moveTo(-40, -40); g.lineTo(-10, -26); g.moveTo(40, -40); g.lineTo(10, -26); g.stroke();
+      g.lineWidth = 5; g.strokeRect(-30, 14, 60, 26); g.beginPath(); g.moveTo(-10, 14); g.lineTo(-10, 40); g.moveTo(10, 14); g.lineTo(10, 40); g.stroke();
+      g.restore();
+    }
+    TEX.drug = texFrom(c);
+  }
+}
+
+/* ---------------- sound: everything synthesised live ---------------- */
+let actx = null, master = null, noiseBuf = null, muted = false;
+function audio() {
+  if (muted) return null;
+  try {
+    if (!actx) {
+      const A = window.AudioContext || window.webkitAudioContext; if (!A) return null;
+      actx = new A();
+      const comp = actx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4;
+      master = actx.createGain(); master.gain.value = 0.8; master.connect(comp).connect(actx.destination);
+      noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+      const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (actx.state === 'suspended') actx.resume();
+    return actx;
+  } catch (e) { return null; }
+}
+function env(g, t, a, peak, d) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+function osc(type, f0, f1, dur, vol, delay = 0, o = {}) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay, src = a.createOscillator(), g = a.createGain();
+  src.type = type; src.frequency.setValueAtTime(f0, t); if (f1 !== f0) src.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  if (o.vib) { const l = a.createOscillator(), lg = a.createGain(); l.frequency.value = o.vib; lg.gain.value = o.vibDepth || f0 * 0.03; l.connect(lg).connect(src.frequency); l.start(t); l.stop(t + dur + 0.1); }
+  let node = src;
+  if (o.lp) { const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; src.connect(f); node = f; }
+  env(g, t, o.a || 0.006, vol, dur); node.connect(g).connect(master); src.start(t); src.stop(t + dur + 0.1);
+}
+function noise(dur, vol, delay = 0, type = 'bandpass', f0 = 1000, f1 = f0, q = 1) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = noiseBuf; f.type = type; f.frequency.setValueAtTime(f0, t); if (f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, t + dur); f.Q.value = q;
+  env(g, t, 0.004, vol, dur); s.connect(f).connect(g).connect(master); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.1);
+}
+const SFX = {
+  grab: () => osc('sine', 500, 750, 0.06, 0.08),
+  gulp: () => { osc('sine', 440, 140, 0.15, 0.24); osc('sine', 1000, 1400, 0.04, 0.05); },
+  slurp: () => osc('sine', 650, 170, 0.32, 0.07, 0, { vib: 20, vibDepth: 45 }),
+  deliver: () => { osc('sine', 680, 1050, 0.07, 0.16); osc('triangle', 1320, 1320, 0.14, 0.07, 0.06); noise(0.04, 0.04, 0, 'highpass', 4000); },
+  swat: () => { noise(0.12, 0.22, 0, 'bandpass', 900, 3000, 1.3); osc('sine', 300, 120, 0.1, 0.12); },
+  thwack: () => { noise(0.07, 0.3, 0, 'lowpass', 2600, 500); osc('sine', 260, 70, 0.14, 0.22); noise(0.28, 0.07, 0.05, 'bandpass', 500, 2600, 1.2); },
+  chomp: () => { for (const d of [0, 0.1]) { noise(0.05, 0.28, d, 'bandpass', 1900, 900, 2); osc('square', 180, 85, 0.06, 0.12, d, { lp: 900 }); } },
+  wrap: () => { osc('sawtooth', 150, 330, 0.26, 0.1, 0, { lp: 1200, vib: 24, vibDepth: 30 }); osc('sine', 330, 110, 0.3, 0.12, 0.16); },
+  clank: () => { osc('square', 620, 600, 0.2, 0.07, 0, { lp: 3200 }); osc('square', 931, 900, 0.18, 0.05, 0, { lp: 3200 }); noise(0.06, 0.12, 0, 'highpass', 2500); osc('sine', 120, 55, 0.28, 0.16); },
+  bonk: () => { osc('square', 230, 150, 0.1, 0.07, 0, { lp: 1100 }); osc('triangle', 190, 120, 0.12, 0.07); },
+  plug: () => { osc('sine', 1100, 320, 0.14, 0.11); osc('sine', 130, 55, 0.25, 0.28, 0.08); noise(0.06, 0.18, 0.08, 'lowpass', 900, 300); },
+  unplug: () => { osc('sine', 260, 1300, 0.07, 0.22); noise(0.05, 0.2, 0, 'bandpass', 3200, 2000, 2); },
+  sparkle: (d = 0) => [784, 988, 1175, 1568].forEach((f, i) => osc('triangle', f, f, 0.1, 0.06, d + i * 0.05)),
+  chol: () => { osc('triangle', 660, 660, 0.12, 0.08); osc('triangle', 990, 990, 0.16, 0.07, 0.08); },
+  gm3: () => { [659, 831, 988, 1319].forEach((f, i) => osc('square', f, f, 0.1, 0.045, i * 0.055, { lp: 3000 })); osc('sine', 1319, 1319, 0.5, 0.05, 0.22, { vib: 7, vibDepth: 8 }); },
+  lipidIn: () => { osc('sine', 330, 440, 0.09, 0.07); osc('sine', 440, 587, 0.1, 0.06, 0.1); },
+  lipidOut: () => osc('sine', 587, 330, 0.18, 0.05),
+  click: () => osc('triangle', 880, 990, 0.05, 0.08),
+  level: () => [392, 523, 659, 784].forEach((f, i) => osc('square', f, f, i === 3 ? 0.45 : 0.12, 0.05, i * 0.11, { lp: 2400 })),
+  start: () => [392, 523, 659].forEach((f, i) => osc('triangle', f, f, 0.1, 0.08, i * 0.07)),
+  win: () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => osc('square', f, f, i > 3 ? 0.4 : 0.12, 0.05, i * 0.12, { lp: 2600 })),
+  over: () => [[311, 0.3], [294, 0.3], [277, 0.3], [262, 1.0]].forEach(([f, d], i) => osc('sawtooth', f, i === 3 ? f * 0.97 : f, d, 0.09, i * 0.36, { lp: 900, a: 0.03, vib: i === 3 ? 5.5 : 0, vibDepth: 7 })),
+};
+const sfx = (k, a) => { if (!muted && SFX[k]) { try { SFX[k](a); } catch (e) {} } };
+
+/* ---------------- the membrane: two leaflets of instanced lipids ---------------- */
+const LIPS = [], headMeshes = [];
+let tailMesh = null;
+function buildMembrane() {
+  const sp = 0.05;
+  for (let leaf = 0; leaf < 2; leaf++) for (let r = -10; r <= 10; r++) for (let c = -10; c <= 10; c++) {
+    const x = (c + ((r & 1) ? 0.5 : 0) + (leaf ? 0.25 : 0)) * sp, z = (r + (leaf ? 0.5 : 0)) * sp * 0.866, d = Math.hypot(x, z);
+    if (d > MR) continue;
+    LIPS.push({ bx: x, bz: z, d0: d, leaf, v: 0, slot: 0, ph: Math.random() * TAU, thr: Math.random() });
+  }
+  const counts = [0, 0, 0];
+  for (const l of LIPS) { const f = Math.random(); l.v = f < 0.55 ? 0 : f < 0.8 ? 1 : 2; l.slot = counts[l.v]++; }
+  for (let v = 0; v < 3; v++) {
+    const m = new THREE.InstancedMesh(sph(0.0145, 16, 12), toon(0xffffff, TEX.lip[v]), counts[v]);
+    const o = new THREE.InstancedMesh(sph(0.0169, 10, 8), INK, counts[v]);
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    o.instanceMatrix = m.instanceMatrix;          // the outline shares the head's matrices
+    m.frustumCulled = o.frustumCulled = false;
+    stage.add(o, m); headMeshes.push(m);
+  }
+  const tg = new THREE.CylinderGeometry(0.0022, 0.0016, 0.036, 5, 1, true); tg.translate(0, -0.018, 0);
+  tailMesh = new THREE.InstancedMesh(tg, toon(COL.tail), LIPS.length * 2);
+  tailMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); tailMesh.frustumCulled = false;
+  stage.add(tailMesh);
+  // a faint disc of water under the membrane and two teaching labels
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(MR + 0.03, MR + 0.03, 0.004, 48), new THREE.MeshBasicMaterial({ color: 0x6a8fbd, transparent: true, opacity: 0.12, depthWrite: false }));
+  disc.position.y = -LEAF - 0.03; stage.add(disc);
+}
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = V3(), _s = V3(1, 1, 1);
+function updateMembrane(t) {
+  const k = G.instab, gap = G.gap;
+  for (let i = 0; i < LIPS.length; i++) {
+    const l = LIPS[i];
+    let x = l.bx, z = l.bz, sc = 1;
+    const d = l.d0;
+    if (d < 0.062) sc = 1 - gap;                                   // where the protein sits
+    else if (gap > 0.001) { const f = (d + 0.035 * gap * Math.exp(-(d - 0.062) / 0.045)) / d; x *= f; z *= f; }
+    for (let j = 0; j < memItems.length; j++) {                    // part around lipids diffusing in
+      const m = memItems[j]; if (m.leaf !== l.leaf || m.a <= 0.01) continue;
+      const dx = x - m.pos.x, dz = z - m.pos.z, dd = dx * dx + dz * dz;
+      if (dd < 0.0036) { const dl = Math.sqrt(dd) || 1e-4, f = (0.06 - dl) / 0.06 * 0.024 * m.a; x += dx / dl * f; z += dz / dl * f; }
+    }
+    const s = l.leaf ? -1 : 1;
+    const peel = k > 0.45 && l.thr < (k - 0.45) * 1.6 && d < 0.26 ? (k - 0.45) * 0.05 : 0;
+    const y = s * (LEAF + peel) + Math.sin(t * 1.6 + l.ph) * 0.0012
+      + (k > 0.01 ? (Math.sin(x * 15 + t * 2.2) + Math.sin(z * 18 - t * 3.0)) * 0.005 * k + Math.sin(t * 9 + l.ph * 3) * 0.002 * k : 0);
+    const tx = (Math.sin(t * 2.5 + l.ph) * 0.25 + (l.thr - 0.5)) * k, tz = Math.cos(t * 2.1 + l.ph) * 0.25 * k;
+    _e.set(tx, 0, tz); _q.setFromEuler(_e); _p.set(x, y, z); _s.setScalar(sc);
+    _m.compose(_p, _q, _s); headMeshes[l.v].setMatrixAt(l.slot, _m);
+    for (let o = 0; o < 2; o++) {
+      const w = Math.sin(t * (2.2 + k * 4) + l.ph + o * 1.7) * (0.12 + k * 0.35);
+      _e.set((l.leaf ? Math.PI : 0) + w + tx, 0, (o ? 0.12 : -0.12) + tz); _q.setFromEuler(_e);
+      _p.set(x + (o ? 0.0055 : -0.0055), y - s * 0.012, z);
+      _m.compose(_p, _q, _s); tailMesh.setMatrixAt(i * 2 + o, _m);
+    }
+  }
+  for (const m of headMeshes) m.instanceMatrix.needsUpdate = true;
+  tailMesh.instanceMatrix.needsUpdate = true;
+}
+
+/* ---------------- Mr Membrane Protein ---------------- */
+const PR = { g: null, head: null, mat: null, arms: [], face: 'happy', hurt: 0, eat: 0, blink: 0, blinkIn: 2, lift: 0, yaw: 0 };
+function buildProtein() {
+  const g = new THREE.Group(); stage.add(g); PR.g = g;
+  for (const [cx, ph] of [[-0.026, 0], [0.026, 1.4]]) {
+    const pts = [], y0 = -0.105, y1 = HEAD_Y - 0.045, turns = (y1 - y0) / 0.032;
+    for (let i = 0; i <= 160; i++) { const u = i / 160, th = u * turns * TAU + ph; pts.push(new THREE.Vector3(cx + Math.cos(th) * 0.013, y0 + u * (y1 - y0), Math.sin(th) * 0.013)); }
+    const curve = new THREE.CatmullRomCurve3(pts);
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 320, 0.0105, 6), INK));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 320, 0.0085, 8), toon(COL.leaf)));
+  }
+  const head = new THREE.Group(); head.position.y = HEAD_Y; g.add(head); PR.head = head;
+  PR.mat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: gradTex, map: TEX.happy });
+  const hm = new THREE.Mesh(sph(HEAD_R, 40, 30), PR.mat); hm.scale.set(1.04, 1, 0.98);
+  const ho = new THREE.Mesh(sph(HEAD_R * 1.055, 28, 20), INK); ho.scale.copy(hm.scale);
+  head.add(ho, hm);
+  for (const s of [-1, 1]) {
+    const pivot = new THREE.Group(); pivot.position.set(s * HEAD_R * 0.86, -0.004, 0); head.add(pivot);
+    const arm = new THREE.Mesh(cylG(0.0085, 0.05, 10), toon(COL.leaf)); arm.rotation.z = Math.PI / 2; arm.position.x = s * 0.025;
+    const armO = new THREE.Mesh(cylG(0.0105, 0.052, 10), INK); armO.rotation.z = Math.PI / 2; armO.position.x = s * 0.025;
+    pivot.add(armO, arm);
+    const hand = ball(pivot, 0.013, COL.leaf); hand.position.x = s * 0.055;
+    for (const [dx, dy] of [[0.012, 0.009], [0.016, 0], [0.012, -0.009], [0.002, 0.014]]) { const f = ball(hand, 0.0058, COL.leaf); f.position.set(s * dx, dy, 0); }
+    PR.arms.push({ pivot, s });
+  }
+}
+const headPos = out => out.set(0, HEAD_Y + PR.lift + PR.head.position.y - HEAD_Y, 0);
+function setFace(f) { if (PR.face !== f) { PR.face = f; PR.mat.map = TEX[f]; } }
+
+/* ---------------- things that move ---------------- */
+const items = [], foes = [], bound = [], memItems = [], flyers = [], cargo = [], texts = [];
+function makeSolute() {
+  const o = new THREE.Group();
+  ball(o, 0.012, 0, TEX.lig);
+  const r = ball(o, 0.0055, COL.oxy); r.position.set(0.017, 0.007, 0);
+  const w = ball(o, 0.0048, COL.white); w.position.set(-0.013, -0.012, 0.002);
+  stick(o, new THREE.Vector3(), r.position); stick(o, new THREE.Vector3(), w.position);
+  return o;
+}
+const makeIon = kind => { const o = new THREE.Group(); ball(o, 0.0095, 0, TEX[kind]); return o; };
+function makeBaddie(kind) {
+  const o = new THREE.Group();
+  const head = ball(o, kind === 'det' ? 0.0125 : 0.0115, 0, TEX[kind + 'O']);
+  const beads = [];
+  const n = kind === 'det' ? 6 : 10;
+  for (let i = 0; i < n; i++) {
+    let m;
+    if (kind === 'det') m = new THREE.Mesh(sph(0.0034 - i * 0.00037, 8, 6), INK_SOLID);
+    else if (kind === 'amp') m = i % 2 ? new THREE.Mesh(sph(0.0028, 8, 6), toon(COL.ampD)) : ball(null, 0.0046, COL.amp, null, 1.18);
+    else m = i % 2 ? new THREE.Mesh(sph(0.0034, 8, 6), toon(COL.sma)) : (() => { const h = new THREE.Group(); h.add(new THREE.Mesh(geo('hex', () => new THREE.CylinderGeometry(0.0055, 0.0055, 0.0026, 6)), toon(COL.white))); h.add(new THREE.Mesh(geo('hexO', () => new THREE.CylinderGeometry(0.0066, 0.0066, 0.0038, 6)), INK)); return h; })();
+    o.add(m); beads.push(m);
+  }
+  return { o, head, beads };
+}
+function makeDrug() {
+  const o = new THREE.Group();
+  const cap = new THREE.Mesh(geo('cap', () => new THREE.CapsuleGeometry(0.0105, 0.022, 6, 16)), toon(0xffffff, TEX.drug));
+  const capO = new THREE.Mesh(geo('capO', () => new THREE.CapsuleGeometry(0.0122, 0.0236, 4, 12)), INK);
+  o.add(capO, cap);
+  return o;
+}
+function makeChol() {
+  const o = new THREE.Group(), a = 0.0058;
+  const hexG = geo('cholHex', () => new THREE.CylinderGeometry(a, a, 0.0045, 6)), hexO = geo('cholHexO', () => new THREE.CylinderGeometry(a * 1.18, a * 1.18, 0.006, 6));
+  const pentG = geo('cholPent', () => new THREE.CylinderGeometry(a * 0.85, a * 0.85, 0.0045, 5)), pentO = geo('cholPentO', () => new THREE.CylinderGeometry(a * 1.02, a * 1.02, 0.006, 5));
+  const put = (g, go, x, y) => { for (const [gg, mm] of [[go, INK], [g, toon(COL.chol)]]) { const m = new THREE.Mesh(gg, mm); m.rotation.x = Math.PI / 2; m.rotation.y = Math.PI / 2; m.position.set(x, y, 0); o.add(m); } };
+  put(hexG, hexO, 0, 0); put(hexG, hexO, 1.5 * a, -0.866 * a); put(hexG, hexO, 0, -1.732 * a); put(pentG, pentO, 1.5 * a, -2.55 * a);
+  stick(o, new THREE.Vector3(1.5 * a, -3.3 * a, 0), new THREE.Vector3(1.1 * a, -5.8 * a, 0), 0.0012);
+  for (const y of [0, -1.732 * a]) { const e = ball(o, 0.0024, COL.white, null, 1.25); e.position.set(0, y, 0.003); const p = new THREE.Mesh(sph(0.0009, 6, 5), INK_SOLID); p.position.set(0.0004, y, 0.0052); o.add(p); }
+  // ring system near the headgroups, tail reaching toward the bilayer centre (upper-leaflet pose)
+  const wrap = new THREE.Group(); o.position.set(-0.75 * a, 0.0042, 0); wrap.add(o);
+  return wrap;
+}
+function makePIP() {
+  const o = new THREE.Group();
+  const hex = new THREE.Mesh(geo('pipHex', () => new THREE.CylinderGeometry(0.012, 0.012, 0.006, 6)), toon(COL.pip)); hex.rotation.x = Math.PI / 2;
+  const hexO = new THREE.Mesh(geo('pipHexO', () => new THREE.CylinderGeometry(0.0138, 0.0138, 0.008, 6)), INK); hexO.rotation.x = Math.PI / 2;
+  o.add(hexO, hex);
+  for (const s of [-1, 1]) { const p = ball(o, 0.005, COL.pipP); p.position.set(s * 0.013, -0.009, 0); }
+  for (const s of [-1, 1]) { const e = new THREE.Mesh(sph(0.0016, 6, 5), INK_SOLID); e.position.set(s * 0.0038, 0.001, 0.0034); o.add(e); }
+  for (const s of [-1, 1]) { const tl = new THREE.Mesh(cylG(0.002, 0.038, 5), toon(COL.tail)); tl.position.set(s * 0.004, 0.026, 0); o.add(tl); }
+  return o;   // headgroup at the origin, tails pointing up: the lower-leaflet pose
+}
+function makeGM3() {
+  const o = new THREE.Group();
+  for (const s of [-1, 1]) { const tl = new THREE.Mesh(cylG(0.002, 0.04, 5), toon(COL.tail)); tl.position.set(s * 0.0045, -0.026, 0); o.add(tl); }
+  stick(o, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.022, 0), 0.0015); stick(o, new THREE.Vector3(0, 0.022, 0), new THREE.Vector3(0.013, 0.04, 0), 0.0015);
+  ball(o, 0.0085, COL.glc);                                         // Glc: blue circle
+  const gal = ball(o, 0.0082, COL.gal); gal.position.y = 0.022;       // Gal: yellow circle
+  const sia = new THREE.Group(); sia.position.set(0.013, 0.04, 0); o.add(sia);   // Neu5Ac: purple diamond
+  sia.add(new THREE.Mesh(geo('oct', () => new THREE.OctahedronGeometry(0.0095)), toon(COL.sia)));
+  sia.add(new THREE.Mesh(geo('octO', () => new THREE.OctahedronGeometry(0.0115)), INK));
+  for (const s of [-1, 1]) { const e = new THREE.Mesh(sph(0.0014, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffffff })); e.position.set(s * 0.003, 0.001, 0.0082); o.add(e); }
+  return o;   // Glc at the origin (headgroup level), tails down: the upper-leaflet pose
+}
+
+/* ---------------- floating text ---------------- */
+function floatText(text, pos, color = CSS.ink, size = 1, life = 1.3) {
+  const c = makeCanvas(512, 128), g = c.getContext('2d');
+  g.font = `60px ${FD}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 12; g.strokeStyle = CSS.paper; g.lineJoin = 'round'; g.strokeText(text, 256, 66, 500);
+  g.fillStyle = color; g.fillText(text, 256, 66, 500);
+  const tex = texFrom(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(0.2 * size, 0.05 * size, 1); sp.position.copy(pos); sp.renderOrder = 10;
+  // stack messages that pop up in the same spot instead of overprinting them
+  let n = 0; for (const x of texts) if (x.life > 0.25 && Math.abs(x.sp.position.x - pos.x) < 0.06 && Math.abs(x.sp.position.z - pos.z) < 0.06 && x.sp.position.y > pos.y - 0.02 && x.sp.position.y < pos.y + 0.12) n++;
+  sp.position.y += n * 0.038;
+  stage.add(sp); texts.push({ sp, life, max: life });
+}
+function makeLabel(text, x, y, z) {
+  const c = makeCanvas(512, 128), g = c.getContext('2d');
+  g.font = `52px ${FB}`; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(93,100,90,0.9)'; g.fillText(text, 8, 66);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: texFrom(c), transparent: true }));
+  sp.scale.set(0.16, 0.04, 1); sp.position.set(x, y, z); sp.center.set(0, 0.5); stage.add(sp);
+  return sp;
+}
+
+/* ---------------- panels drawn on canvases ---------------- */
+function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+class Panel {
+  constructor(W, H, widthM, draw) {
+    this.W = W; this.H = H; this.c = makeCanvas(W, H); this.g = this.c.getContext('2d'); this.tex = texFrom(this.c);
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(widthM, widthM * H / W), new THREE.MeshBasicMaterial({ map: this.tex, transparent: true }));
+    this.mesh.userData.panel = this; this.draw = draw; this.btns = []; this.hover = null; this.wM = widthM; this.hM = widthM * H / W;
+  }
+  redraw() { const g = this.g; g.clearRect(0, 0, this.W, this.H); this.btns = []; this.draw(g, this); this.tex.needsUpdate = true; }
+  card(g) {
+    const W = this.W, H = this.H;
+    roundRect(g, 16, 16, W - 26, H - 26, 30); g.fillStyle = CSS.ink; g.fill();
+    roundRect(g, 6, 6, W - 26, H - 26, 30); g.fillStyle = CSS.card; g.fill(); g.lineWidth = 6; g.strokeStyle = CSS.ink; g.stroke();
+  }
+  button(g, id, x, y, w, h, label, o = {}) {
+    this.btns.push({ id, x, y, w, h });
+    const hov = this.hover === id;
+    roundRect(g, x + 7, y + 7, w, h, 18); g.fillStyle = CSS.ink; g.fill();
+    roundRect(g, x, y, w, h, 18); g.fillStyle = o.on ? CSS.leaf : (o.ghost ? CSS.card : CSS.leaf); g.fill();
+    g.lineWidth = hov ? 9 : 5; g.strokeStyle = hov ? '#2f6b0a' : CSS.ink; g.stroke();
+    g.fillStyle = o.on || !o.ghost ? '#fff' : CSS.ink; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `${o.size || 46}px ${FD}`; g.fillText(label, x + w / 2, y + h / 2 + (o.sub ? -10 : 2), w - 20);
+    if (o.sub) { g.font = `28px ${FB}`; g.fillText(o.sub, x + w / 2, y + h / 2 + 26, w - 20); }
+  }
+  at(uv) { const px = uv.x * this.W, py = (1 - uv.y) * this.H; return this.btns.find(b => px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) || null; }
+}
+const wrapText = (g, text, x, y, maxW, lh) => {
+  const words = text.split(' '); let line = '';
+  for (const w of words) { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y); y += lh; line = w; } else line = t; }
+  if (line) g.fillText(line, x, y);
+  return y + lh;
+};
+let menuPanel, hudPanel, overPanel;
+function buildPanels() {
+  menuPanel = new Panel(1024, 700, 0.58, (g, p) => {
+    p.card(g);
+    g.fillStyle = CSS.ink; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.font = `66px ${FD}`; g.fillText("Don't Get Solubilised", 46, 104);
+    g.font = `33px ${FB}`; g.fillStyle = CSS.ink;
+    let y = 152;
+    for (const line of ['Grab solutes and ions and feed them to Mr Membrane Protein.', 'Swat detergents away. Poke cholesterol, PIP₂ and GM3 in the membrane.', "Pull baddies off his legs. Ten stuck on and he's solubilised!"]) y = wrapText(g, line, 46, y, 930, 38);
+    g.font = `26px ${FB}`; g.fillStyle = CSS.muted; g.fillText('DIFFICULTY', 46, y + 18);
+    const by = y + 36;
+    ['easy', 'medium', 'hard'].forEach((k, i) => p.button(g, 'diff:' + k, 46 + i * 314, by, 290, 104, MODES[k].label, { on: G.diff === k, ghost: G.diff !== k, sub: 'Best ' + G.best[k], size: 44 }));
+    const sy = by + 140;
+    p.button(g, 'start', 46, sy, 420, 116, 'Start', { size: 64 });
+    p.button(g, 'place', 500, sy, 206, 116, 'Move here', { ghost: true, size: 34 });
+    p.button(g, 'down', 728, sy, 108, 116, '▼', { ghost: true, size: 44 });
+    p.button(g, 'up', 852, sy, 108, 116, '▲', { ghost: true, size: 44 });
+    g.font = `26px ${FB}`; g.fillStyle = CSS.muted; g.textAlign = 'left';
+    g.fillText('Pinch, or pull the trigger, to grab. Poke or point-and-pinch to press buttons.', 46, sy + 160, 930);
+  });
+  hudPanel = new Panel(1024, 210, 0.5, (g, p) => {
+    p.card(g);
+    const left = Math.max(0, TUNE.roundSeconds - G.t);
+    g.fillStyle = CSS.muted; g.font = `26px ${FB}`; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.fillText('SCORE', 40, 54); g.textAlign = 'center'; g.fillText(`LEVEL ${G.level} · ${MODES[G.diff].label.toUpperCase()}`, 512, 54);
+    g.textAlign = 'right'; g.fillText(`STUCK ON ${Math.min(MAX_BOUND, boundSum())}/${MAX_BOUND}`, 984, 54);
+    g.fillStyle = CSS.ink; g.font = `64px ${FD}`; g.textAlign = 'left'; g.fillText(String(G.score), 40, 122);
+    g.textAlign = 'center'; g.fillText(`${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 512, 122);
+    const pips = []; for (const b of bound) for (let i = 0; i < WEIGHT[b.kind]; i++) pips.push(b.kind);
+    for (let i = 0; i < MAX_BOUND; i++) {
+      const x = 984 - (MAX_BOUND - 1 - i) * 34 - 14;
+      g.beginPath(); g.arc(x, 100, 13, 0, TAU); g.fillStyle = pips[i] ? CSS[pips[i]] : CSS.card; g.fill(); g.lineWidth = 4; g.strokeStyle = boundSum() >= 7 ? CSS.chol : CSS.ink; g.stroke();
+    }
+    g.font = `34px ${FB}`; g.textAlign = 'center';
+    const bits = [];
+    if (G.plug) bits.push(['Pore blocked: pull the drug out!', CSS.drug]);
+    if (G.boost > 0) bits.push([`GM3: double points ${Math.ceil(G.boost)}s`, CSS.sia]);
+    if (G.bannerT > 0 && G.banner) bits.unshift([G.banner, CSS.leaf]);
+    if (bits.length) { g.fillStyle = bits[0][1]; g.fillText(bits.map(b => b[0]).slice(0, 2).join('  ·  '), 512, 176, 950); }
+  });
+  overPanel = new Panel(1024, 600, 0.58, (g, p) => {
+    p.card(g);
+    g.fillStyle = CSS.ink; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.font = `70px ${FD}`; g.fillText(G.survived ? 'Membrane intact!' : 'Solubilised!', 46, 110);
+    g.font = `36px ${FB}`;
+    let y = wrapText(g, G.survived ? `Mr Membrane Protein survived the round on ${MODES[G.diff].label}.` : `Detergents pulled Mr Membrane Protein out of the bilayer on level ${G.level}.`, 46, 170, 930, 42);
+    y = wrapText(g, `You carried ${G.solutes} solute${G.solutes === 1 ? '' : 's'} and ${G.ions} ion${G.ions === 1 ? '' : 's'} into the cytoplasm and swatted ${G.swats} baddie${G.swats === 1 ? '' : 's'}.`, 46, y, 930, 42);
+    g.font = `64px ${FD}`; g.fillText(`${G.score} points`, 46, y + 50);
+    g.font = `30px ${FB}`; g.fillStyle = G.newBest ? CSS.leaf : CSS.muted; g.fillText(G.newBest ? `New ${MODES[G.diff].label} best!` : `${MODES[G.diff].label} best: ${G.best[G.diff]}`, 46, y + 96);
+    const by = 440;
+    p.button(g, 'start', 46, by, 400, 112, 'Play again', { size: 54 });
+    p.button(g, 'menu', 480, by, 260, 112, 'Menu', { ghost: true, size: 44 });
+    p.button(g, 'place', 774, by, 196, 112, 'Move here', { ghost: true, size: 32 });
+  });
+  for (const pnl of [menuPanel, hudPanel, overPanel]) { stage.add(pnl.mesh); pnl.redraw(); }
+  menuPanel.mesh.position.set(0, 0.5, 0.12);   // above his head, just in front of him
+  overPanel.mesh.position.set(0, 0.3, 0.16);   // lower and nearer, so the lifted-out protein stays visible above it
+  hudPanel.mesh.position.set(0, 0.66, -0.12);
+  facePanels();
+}
+function facePanels() {
+  const eye = stage.localToWorld(new THREE.Vector3(0, TUNE.eyeDrop, TUNE.distance));
+  for (const p of [menuPanel, hudPanel, overPanel]) p.mesh.lookAt(eye);
+}
+const panels = () => [menuPanel, hudPanel, overPanel].filter(p => p.mesh.visible);
+
+/* ---------------- game state ---------------- */
+const G = { state: 'menu', diff: 'easy', t: 0, level: 1, score: 0, solutes: 0, ions: 0, swats: 0, boost: 0, plug: null, plugT: 0,
+  gap: 1, instab: 0, intros: new Set(), nextItem: 1, nextFoe: {}, nextMem: 4, banner: '', bannerT: 0, overT: 0, survived: false, newBest: false,
+  best: { easy: 0, medium: 0, hard: 0 }, hudSig: '' };
+try { for (const k in G.best) G.best[k] = parseInt(localStorage.getItem('dgsxr-best-' + k) || '0', 10) || 0; const d = localStorage.getItem('dgsxr-diff'); if (MODES[d]) G.diff = d; } catch (e) {}
+const MODE = () => MODES[G.diff];
+const boundSum = () => bound.reduce((s, b) => s + WEIGHT[b.kind], 0);
+const ramp = () => clamp(G.t / TUNE.roundSeconds, 0, 1);
+const levelOf = t => 1 + [...new Set(Object.values(MODE().intro))].filter(x => x > 0 && x <= t).length;
+
+function clearAll() {
+  for (const arr of [items, foes, bound, memItems, flyers, cargo]) { for (const e of arr) removeEnt(e); arr.length = 0; }
+  if (G.plug) { removeEnt(G.plug); G.plug = null; }
+}
+function removeEnt(e) {
+  if (e.obj && e.obj.parent) e.obj.parent.remove(e.obj);
+  if (e.ring) { e.ring.parent && e.ring.parent.remove(e.ring); e.ring.geometry.dispose(); }
+  if (e.glow && e.glow.parent) e.glow.parent.remove(e.glow);
+  for (const x of inputs) if (x.held === e) x.held = null;
+  if (mouse.held === e) mouse.held = null;
+}
+function showMenu() {
+  G.state = 'menu'; clearAll(); PR.lift = 0; G.gap = 1;
+  menuPanel.mesh.visible = true; overPanel.mesh.visible = false; hudPanel.mesh.visible = false;
+  menuPanel.redraw();
+}
+function startRound() {
+  clearAll();
+  Object.assign(G, { state: 'playing', t: 0, level: 1, score: 0, solutes: 0, ions: 0, swats: 0, boost: 0, plugT: 0, gap: 1, instab: 0,
+    nextItem: 0.6, nextFoe: {}, nextMem: 3, banner: '', bannerT: 0, survived: false, newBest: false });
+  G.intros = new Set();
+  PR.lift = 0;
+  menuPanel.mesh.visible = false; overPanel.mesh.visible = false; hudPanel.mesh.visible = true;
+  const first = Object.entries(MODE().intro).filter(([, v]) => v === 0).map(([k]) => k);
+  first.forEach(k => G.intros.add(k));
+  G.banner = first.length ? 'Level 1: ' + first.map(k => INTRO_MSG[k]).join('. ') : 'Level 1: catch solutes and ions and feed him';
+  G.bannerT = 5;
+  floatText('Level 1', new THREE.Vector3(0, 0.36, 0.05), CSS.ink, 1.6, 2);
+  sfx('start');
+}
+function endRound(survived) {
+  if (G.state !== 'playing') return;
+  G.state = 'over'; G.survived = survived; G.overT = survived ? 1.4 : 2.6;
+  for (const x of inputs) release(x);
+  if (mouse.held) mouseRelease();
+  if (survived) { G.score += 50; floatText('Membrane intact! +50', new THREE.Vector3(0, 0.38, 0.05), CSS.leaf, 1.4, 2); sfx('win'); }
+  else { sfx('over'); setFace('sad'); }
+  for (const e of foes) toFlyer(e, new THREE.Vector3(rnd(-1, 1), 0.6, rnd(-1, 1)).multiplyScalar(0.25));
+  foes.length = 0;
+  for (const it of items) { it.state = 'fade'; }
+  G.newBest = G.score > G.best[G.diff];
+  if (G.newBest) { G.best[G.diff] = G.score; try { localStorage.setItem('dgsxr-best-' + G.diff, String(G.score)); } catch (e) {} }
+}
+function pressButton(id) {
+  sfx('click');
+  if (id.startsWith('diff:')) { G.diff = id.slice(5); try { localStorage.setItem('dgsxr-diff', G.diff); } catch (e) {} menuPanel.redraw(); }
+  else if (id === 'start') startRound();
+  else if (id === 'menu') showMenu();
+  else if (id === 'place') { if (renderer.xr.isPresenting) needPlace = true; }
+  else if (id === 'up' || id === 'down') { stage.position.y += id === 'up' ? 0.03 : -0.03; syncStage(); }
+}
+
+/* ---------------- spawning ---------------- */
+function spawnItem() {
+  if (items.length > 9) return;
+  const ion = Math.random() < 0.4, n = ion ? 1 + (Math.random() < 0.5 ? 1 : 0) : 1;
+  const a = Math.random() * TAU, rr = Math.sqrt(Math.random()) * 0.3;
+  for (let i = 0; i < n; i++) {
+    const kind = ion ? (Math.random() < 0.55 ? 'na' : 'cl') : 'lig';
+    const obj = kind === 'lig' ? makeSolute() : makeIon(kind);
+    const pos = new THREE.Vector3(Math.cos(a) * rr + (i ? rnd(-0.04, 0.04) : 0), 0.5 + i * 0.03, Math.sin(a) * rr * 0.75 + (i ? rnd(-0.04, 0.04) : 0));
+    stage.add(obj);
+    const vy = -TUNE.fallSpeed * rnd(0.85, 1.15) * (ion ? 1.12 : 1);
+    items.push({ kind, obj, pos, vy, vFall: vy, vx: 0, vz: 0, ph: rnd(0, TAU), r: (kind === 'lig' ? 0.014 : 0.01) * TUNE.itemScale, state: 'fall', a: 0, spin: rnd(-0.6, 0.6) });
+  }
+}
+function spawnFoe(kind) {
+  if (foes.length > 8) return;
+  const a = rnd(0, TAU), y = rnd(0.07, 0.34);
+  const pos = new THREE.Vector3(Math.cos(a) * 0.5, y, Math.sin(a) * 0.42);
+  const e = { kind, pos, vel: V3(), t: 0, ph: rnd(0, TAU), aim: rnd(0, TAU), aimY: rnd(-0.03, 0.09), trail: [pos.clone()], a: 0,
+    r: (kind === 'drug' ? 0.016 : kind === 'det' ? 0.014 : 0.013) * TUNE.itemScale,
+    speed: TUNE.foeSpeed * MODE().speed * (kind === 'det' ? rnd(0.9, 1.15) : kind === 'drug' ? 0.9 : kind === 'amp' ? 0.85 : 0.75) };
+  if (kind === 'drug') { e.obj = makeDrug(); e.spin = V3().set(rnd(-2, 2), rnd(-2, 2), rnd(-2, 2)); }
+  else { const b = makeBaddie(kind); e.obj = b.o; e.head = b.head; e.beads = b.beads; }
+  e.obj.position.copy(pos); e.obj.scale.setScalar(0.01);
+  stage.add(e.obj); foes.push(e);
+}
+function spawnMem() {
+  const I = MODE().intro, kinds = ['chol', 'pip', 'gm3'].filter(k => G.intros.has(k));
+  if (!kinds.length || memItems.filter(m => m.state !== 'bound').length >= 2) return;
+  const kind = kinds[Math.floor(Math.random() * kinds.length)];
+  const leaf = kind === 'pip' ? 1 : kind === 'gm3' ? 0 : (Math.random() < 0.5 ? 0 : 1);
+  const a = rnd(0, TAU), ta = a + rnd(-0.3, 0.3), tr = rnd(0.15, 0.3);
+  const obj = kind === 'chol' ? makeChol() : kind === 'pip' ? makePIP() : makeGM3();
+  if (kind === 'chol' && leaf) obj.rotation.z = Math.PI;              // lower-leaflet cholesterol points the other way
+  const m = { kind, leaf, obj, pos: new THREE.Vector3(Math.cos(a) * (MR + 0.04), 0, Math.sin(a) * (MR + 0.04)), from: V3(), to: new THREE.Vector3(Math.cos(ta) * tr, 0, Math.sin(ta) * tr),
+    t: 0, tin: 1.6, stay: lerp(4.6, 3.2, ramp()) * (G.diff === 'hard' ? 0.8 : 1), tout: 1.4, state: 'in', a: 1, ph: rnd(0, TAU), I };
+  m.from.copy(m.pos);
+  m.glow = new THREE.Mesh(sph(0.03, 12, 9), new THREE.MeshBasicMaterial({ color: kind === 'chol' ? COL.chol : kind === 'pip' ? COL.pip : COL.sia, transparent: true, opacity: 0.22, depthWrite: false }));
+  m.ring = new THREE.Mesh(new THREE.RingGeometry(0.011, 0.016, 24), new THREE.MeshBasicMaterial({ color: kind === 'chol' ? COL.chol : kind === 'pip' ? COL.pip : COL.sia, side: THREE.DoubleSide, depthWrite: false }));
+  m.ringT = 0;
+  stage.add(obj, m.glow, m.ring); memItems.push(m);
+  sfx('lipidIn');
+}
+
+/* ---------------- interactions ---------------- */
+const _h = V3(), _w = V3(), _wq = new THREE.Quaternion(), _d = V3(), _tmp = V3(), camL = V3(), camQL = new THREE.Quaternion();
+function boundAnchor(b, out) {
+  if (b.kind === 'det') { const a = b.slot * TAU / 10 + 0.31; return out.set(Math.cos(a) * 0.05, 0.10 - (b.slot % 5) * 0.04 + PR.lift, Math.sin(a) * 0.05); }
+  return out.set(Math.cos(b.jawA) * 0.062, b.bandY + PR.lift, Math.sin(b.jawA) * 0.062);
+}
+function feed(it) {
+  if (G.plug) { bounceOffHead(it); return; }
+  const i = items.indexOf(it); if (i >= 0) items.splice(i, 1);
+  for (const x of inputs) if (x.held === it) x.held = null;
+  if (mouse.held === it) mouse.held = null;
+  const pts = (it.kind === 'lig' ? 10 : 5) * (G.boost > 0 ? 2 : 1);
+  cargo.push({ kind: it.kind, obj: it.obj, t: 0, pts, slurped: false, start: it.pos.clone() });
+  PR.eat = 0.45; sfx('gulp');
+}
+let lastBlockMsg = 0;
+function bounceOffHead(it) {
+  headPos(_h); _d.subVectors(it.pos, _h).normalize();
+  it.pos.copy(_h).addScaledVector(_d, HEAD_R + 0.04);
+  // pop it up and off to the side so it lands on the membrane instead of his head
+  _tmp.set(_d.x, 0, _d.z); if (_tmp.lengthSq() < 0.04) _tmp.set(Math.cos(rnd(0, TAU)), 0, Math.sin(rnd(0, TAU)));
+  _tmp.normalize(); it.vx = _tmp.x * 0.22; it.vz = _tmp.z * 0.22; it.vy = 0.08;
+  it.state = 'fall';
+  for (const x of inputs) if (x.held === it) x.held = null;
+  if (mouse.held === it) mouse.held = null;
+  if (performance.now() - lastBlockMsg > 900) { floatText('Pore blocked!', it.pos.clone().add(new THREE.Vector3(0, 0.03, 0)), CSS.drug, 0.9); lastBlockMsg = performance.now(); }
+  sfx('bonk');
+}
+function swat(e, vel) {
+  const i = foes.indexOf(e); if (i >= 0) foes.splice(i, 1);
+  const v = vel ? vel.clone().multiplyScalar(0.5) : V3();
+  _d.copy(e.pos).setY(0).normalize(); v.addScaledVector(_d, 0.35).add(new THREE.Vector3(0, 0.25, 0));
+  toFlyer(e, v);
+  G.score += 2; G.swats++;
+  if (Math.random() < 0.5 || e.kind !== 'det') floatText(e.kind === 'drug' ? 'Drug swatted!' : 'Swatted! +2', e.pos.clone().add(new THREE.Vector3(0, 0.03, 0)), CSS.leaf, 0.8);
+  sfx('swat');
+}
+function toFlyer(e, vel) {
+  e.vel = vel.clone(); e.life = 1.2; e.spinF = V3().set(rnd(-6, 6), rnd(-6, 6), rnd(-6, 6));
+  if (e.obj.parent !== stage) stage.attach(e.obj);
+  flyers.push(e);
+}
+function bindFoe(e) {
+  const i = foes.indexOf(e); if (i >= 0) foes.splice(i, 1);
+  if (e.kind === 'drug') { plugPore(e); return; }
+  if (e.kind === 'det') {
+    const used = new Set(bound.filter(b => b.kind === 'det').map(b => b.slot)); let s = 0; while (used.has(s)) s++;
+    e.slot = s % 10;
+  } else {
+    // amphipols and SMA wrap round his legs: swap the swimming chain for a ring
+    const used = bound.filter(b => b.kind !== 'det').length;
+    e.bandY = [0.075, 0.015, -0.045, 0.045, -0.015][used % 5];
+    e.jawA = rnd(0, TAU);
+    for (const b of e.beads) b.visible = false;
+    const ring = new THREE.Group();
+    ring.add(new THREE.Mesh(geo('torusO', () => new THREE.TorusGeometry(0.058, 0.0068, 6, 40)), INK));
+    ring.add(new THREE.Mesh(geo('torus', () => new THREE.TorusGeometry(0.058, 0.005, 6, 40)), toon(e.kind === 'amp' ? COL.amp : COL.sma)));
+    ring.rotation.x = Math.PI / 2;
+    for (let k = 0; k < 10; k++) {
+      const a = k / 10 * TAU, bb = e.kind === 'amp' ? new THREE.Mesh(sph(0.0032, 8, 6), toon(COL.ampD)) : new THREE.Mesh(geo('hex', () => new THREE.CylinderGeometry(0.0055, 0.0055, 0.0026, 6)), toon(COL.white));
+      bb.position.set(Math.cos(a) * 0.066, Math.sin(a) * 0.066, 0); ring.add(bb);
+    }
+    ring.position.y = e.bandY; ring.scale.setScalar(0.2); PR.g.add(ring); e.ringObj = ring;
+  }
+  e.bt = 0; e.from = e.pos.clone(); e.held = false;
+  bound.push(e);
+  PR.hurt = 0.5;
+  const n = boundSum();
+  floatText(e.kind === 'det' ? `Bitten! ${Math.min(n, MAX_BOUND)}/${MAX_BOUND}` : e.kind === 'amp' ? 'Amphipol wrap! +2' : 'SMA belt! +3', new THREE.Vector3(0, 0.33, 0.06), e.kind === 'det' ? CSS.detD : e.kind === 'amp' ? CSS.ampD : CSS.smaD, 1.1);
+  sfx(e.kind === 'det' ? 'chomp' : e.kind === 'amp' ? 'wrap' : 'clank');
+  if (n >= MAX_BOUND) endRound(false);
+}
+function plugPore(e) {
+  if (G.plug) { G.plugT = PLUG_S; toFlyer(e, new THREE.Vector3(0, 0.3, 0.2)); floatText('Still blocked!', new THREE.Vector3(0, 0.33, 0.06), CSS.drug); return; }
+  G.plug = e; G.plugT = PLUG_S; e.bt = 0; e.from = e.pos.clone(); e.held = false;
+  floatText('Drug plugged the pore!', new THREE.Vector3(0, 0.34, 0.06), CSS.drug, 1.1);
+  PR.hurt = 0.4; sfx('plug');
+}
+function unplug(vel) {
+  const e = G.plug; if (!e) return false;
+  G.plug = null; G.plugT = 0;
+  toFlyer(e, vel || new THREE.Vector3(rnd(-0.2, 0.2), 0.4, 0.25));
+  sfx('unplug');
+  return true;
+}
+function pullOff(b, vel) {
+  const i = bound.indexOf(b); if (i < 0) return;
+  bound.splice(i, 1);
+  if (b.ringObj) { PR.g.remove(b.ringObj); b.ringObj = null; for (const bb of b.beads) bb.visible = true; b.trail = [b.pos.clone()]; }
+  toFlyer(b, vel || V3().set(rnd(-0.3, 0.3), 0.35, 0.25));
+}
+function knockOff(n) {
+  let k = 0;
+  while (k < n && bound.length) { const b = bound[bound.length - 1]; boundAnchor(b, _tmp); b.pos.copy(_tmp); pullOff(b); k++; }
+  if (k) sfx('thwack');
+  return k;
+}
+function catchMem(m) {
+  m.state = 'bound'; m.t = 0; m.from.copy(m.pos);
+  const a = Math.atan2(m.pos.z, m.pos.x); m.siteA = a;
+  m.glow.visible = false; m.ring.visible = false;
+  const at = new THREE.Vector3(0, 0.34, 0.06);
+  if (m.kind === 'chol') {
+    const k = knockOff(1);
+    if (k) floatText('Cholesterol knocked one off', at, CSS.chol, 1); else { G.score += 50; floatText('Cholesterol +50', at, CSS.chol, 1); sfx('chol'); }
+  } else if (m.kind === 'pip') {
+    const u = unplug();
+    const k = knockOff(2);
+    const bits = []; if (u) bits.push('unplugged'); if (k) bits.push(`knocked off ${k}`);
+    if (bits.length) floatText('PIP₂ ' + bits.join(' & '), at, CSS.pip, 1); else { G.score += 75; floatText('PIP₂ +75', at, CSS.pip, 1); }
+    sfx('sparkle');
+  } else {
+    G.boost = BOOST_S; G.score += 25;
+    floatText('GM3: double points!', at, CSS.sia, 1.1); sfx('gm3');
+  }
+}
+
+/* ---------------- input: hands, controllers and mouse ---------------- */
+let needPlace = false;
+const inputs = [0, 1].map(i => {
+  const ctrl = renderer.xr.getController(i), grip = renderer.xr.getControllerGrip(i), hand = renderer.xr.getHand(i);
+  scene.add(ctrl, grip, hand);
+  const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
+  const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: COL.ink })); line.visible = false; ctrl.add(line);
+  const dot = new THREE.Mesh(sph(0.007, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+  dot.visible = false; stage.add(dot);
+  const x = { i, ctrl, grip, hand, src: null, isHand: false, down: 0, held: null, has: false, line, dot,
+    grab: V3(), tip: V3(), thumb: V3(), palm: V3(), prevTip: V3(), vel: V3(), pokeCool: 0, first: true };
+  ctrl.addEventListener('connected', ev => { x.src = ev.data; x.isHand = !!ev.data.hand; x.first = true; });
+  ctrl.addEventListener('disconnected', () => { release(x); x.src = null; x.has = false; x.dot.visible = false; x.line.visible = false; });
+  const down = () => { if (x.down++ === 0) press(x); };
+  const up = () => { if (x.down > 0 && --x.down === 0) release(x); };
+  ctrl.addEventListener('selectstart', down); ctrl.addEventListener('selectend', up);
+  ctrl.addEventListener('squeezestart', down); ctrl.addEventListener('squeezeend', up);
+  return x;
+});
+const toLocal = (out, world) => stage.worldToLocal(out.copy(world));
+function readInputs(dt) {
+  for (const x of inputs) {
+    x.has = false;
+    if (!x.src || !renderer.xr.isPresenting) { x.dot.visible = false; x.line.visible = false; continue; }
+    if (x.isHand) {
+      const j = x.hand.joints || {}, it = j['index-finger-tip'], th = j['thumb-tip'], pm = j['middle-finger-metacarpal'];
+      if (it && th && it.visible !== false) {
+        it.getWorldPosition(_w); toLocal(x.tip, _w);
+        th.getWorldPosition(_w); toLocal(x.thumb, _w);
+        (pm || it).getWorldPosition(_w); toLocal(x.palm, _w);
+        x.grab.addVectors(x.tip, x.thumb).multiplyScalar(0.5);
+        x.has = true;
+      }
+    } else {
+      x.grip.getWorldPosition(_w); toLocal(x.palm, _w);
+      x.grip.getWorldQuaternion(_wq); _d.set(0, 0, -1).applyQuaternion(_wq).applyQuaternion(stageInvQ);
+      x.grab.copy(x.palm).addScaledVector(_d, 0.025);
+      x.tip.copy(x.palm).addScaledVector(_d, 0.055);
+      x.thumb.copy(x.grab);
+      x.has = true;
+    }
+    if (x.has) {
+      if (x.first) { x.prevTip.copy(x.tip); x.first = false; }
+      _tmp.subVectors(x.tip, x.prevTip).divideScalar(Math.max(dt, 1e-3));
+      x.vel.lerp(_tmp, 0.5); if (x.vel.length() > 4) x.vel.setLength(4);
+      x.prevTip.copy(x.tip);
+      x.dot.position.copy(x.grab); x.dot.visible = true;
+      x.dot.material.color.setHex(nearestGrabbable(x.grab, TUNE.grabRadius) ? COL.leaf : 0xffffff);
+    } else x.dot.visible = false;
+    x.pokeCool = Math.max(0, x.pokeCool - dt);
+  }
+}
+const raycaster = new THREE.Raycaster();
+function panelHitFromRay(origin, dir) {
+  raycaster.set(origin, dir); raycaster.far = 3;
+  const vis = panels(); if (!vis.length) return null;
+  const hits = raycaster.intersectObjects(vis.map(p => p.mesh), false);
+  if (!hits.length || !hits[0].uv) return null;
+  const p = hits[0].object.userData.panel, b = p.at(hits[0].uv);
+  return { panel: p, btn: b, dist: hits[0].distance };
+}
+function ctrlRay(x) { x.ctrl.getWorldPosition(_w); x.ctrl.getWorldQuaternion(_wq); return { o: _w.clone(), d: new THREE.Vector3(0, 0, -1).applyQuaternion(_wq) }; }
+function nearestGrabbable(p, r) {
+  let best = null, bd = r;
+  const consider = (e, pos, extra, type) => { const d = p.distanceTo(pos) - extra; if (d < bd) { bd = d; best = { e, type }; } };
+  for (const it of items) if (it.state === 'fall' || it.state === 'held') consider(it, it.pos, it.r, 'item');
+  if (G.state === 'playing') {
+    for (const b of bound) consider(b, boundAnchor(b, _h).clone(), 0.012, 'bound');
+    if (G.plug) consider(G.plug, new THREE.Vector3(0, PLUG_Y + PR.lift, 0), 0.015, 'plug');
+    for (const f of foes) consider(f, f.pos, f.r, 'foe');
+    for (const m of memItems) if (m.state !== 'bound' && m.state !== 'gone') consider(m, memCenter(m, _tmp).clone(), 0.02, 'mem');
+  }
+  return best;
+}
+function press(x) {
+  if (!x.has && !x.src) return;
+  const vis = panels();
+  if (vis.some(p => p !== hudPanel)) {
+    const r = ctrlRay(x), hit = panelHitFromRay(r.o, r.d);
+    if (hit && hit.btn) { pressButton(hit.btn.id); haptic(x, 0.4, 25); return; }
+  }
+  if (!x.has) return;
+  const g = nearestGrabbable(x.grab, TUNE.grabRadius);
+  if (!g) return;
+  if (g.type === 'foe') { swat(g.e, x.vel); haptic(x, 0.7, 40); return; }
+  if (g.type === 'mem') { catchMem(g.e); haptic(x, 0.5, 30); return; }
+  x.held = g.e; g.e.heldBy = x;
+  if (g.type === 'item') g.e.state = 'held';
+  else g.e.held = true;
+  haptic(x, 0.3, 20); sfx('grab');
+}
+function release(x) {
+  const e = x.held; if (!e) return;
+  x.held = null; e.heldBy = null;
+  if (items.includes(e)) { e.state = 'fall'; e.vy = e.vFall; e.vx = clamp(x.vel.x * 0.3, -0.3, 0.3); e.vz = clamp(x.vel.z * 0.3, -0.3, 0.3); }
+  else e.held = false;
+}
+function haptic(x, v, ms) { try { const h = x.src && x.src.gamepad && x.src.gamepad.hapticActuators && x.src.gamepad.hapticActuators[0]; if (h) h.pulse(v, ms); } catch (e) {} }
+function hitters() {
+  const out = [];
+  for (const x of inputs) if (x.has) {
+    out.push({ p: x.tip, r: TUNE.hitRadius, v: x.vel, x });
+    out.push({ p: x.palm, r: TUNE.hitRadius + 0.01, v: x.vel, x });
+    if (x.isHand) out.push({ p: x.thumb, r: TUNE.hitRadius, v: x.vel, x });
+  }
+  return out;
+}
+
+// Mouse fallback (desktop preview): click to grab, swat, poke or press; drag held things to his head
+const mouse = { ndc: new THREE.Vector2(), down: false, held: null, o: V3(), d: V3(), inside: false };
+function mouseRay() {
+  raycaster.setFromCamera(mouse.ndc, camera);
+  mouse.wo = raycaster.ray.origin.clone(); mouse.wd = raycaster.ray.direction.clone();
+  toLocal(mouse.o, raycaster.ray.origin); mouse.d.copy(raycaster.ray.direction).applyQuaternion(stageInvQ);
+}
+const rayDist = (p, o, d) => { _tmp.subVectors(p, o); const t = _tmp.dot(d); return _tmp.addScaledVector(d, -t).length(); };
+function mousePress() {
+  mouseRay();
+  const hit = panelHitFromRay(mouse.wo, mouse.wd);
+  if (hit && hit.btn) { pressButton(hit.btn.id); return; }
+  let best = null, bd = 0.025;
+  const consider = (e, pos, r, type) => { const d = rayDist(pos, mouse.o, mouse.d) - r; if (d < bd) { bd = d; best = { e, type }; } };
+  for (const it of items) if (it.state === 'fall') consider(it, it.pos, it.r, 'item');
+  if (G.state === 'playing') {
+    for (const f of foes) consider(f, f.pos, f.r + 0.005, 'foe');
+    for (const m of memItems) if (m.state !== 'bound' && m.state !== 'gone') consider(m, memCenter(m, V3()), 0.02, 'mem');
+    for (const b of bound) consider(b, boundAnchor(b, V3()), 0.012, 'bound');
+    if (G.plug) consider(G.plug, new THREE.Vector3(0, PLUG_Y + PR.lift, 0), 0.015, 'plug');
+  }
+  if (!best) return;
+  if (best.type === 'item') { mouse.held = best.e; best.e.state = 'held'; sfx('grab'); }
+  else if (best.type === 'foe') swat(best.e, mouse.d.clone().multiplyScalar(0.6));
+  else if (best.type === 'mem') catchMem(best.e);
+  else if (best.type === 'bound') { pullOff(best.e); floatText('Pulled off!', new THREE.Vector3(0, 0.33, 0.06), CSS.leaf); sfx('thwack'); }
+  else if (best.type === 'plug') { unplug(); floatText('Unplugged!', new THREE.Vector3(0, 0.33, 0.06), CSS.leaf); }
+}
+function mouseRelease() { const e = mouse.held; if (!e) return; mouse.held = null; if (items.includes(e)) { e.state = 'fall'; e.vy = e.vFall; } }
+const cv = renderer.domElement;
+cv.addEventListener('pointermove', ev => { const r = cv.getBoundingClientRect(); mouse.ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); mouse.inside = true; });
+cv.addEventListener('pointerdown', ev => { if (renderer.xr.isPresenting) return; const r = cv.getBoundingClientRect(); mouse.ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); mouse.down = true; mousePress(); });
+window.addEventListener('pointerup', () => { mouse.down = false; mouseRelease(); });
+
+/* ---------------- per-frame game logic ---------------- */
+// where to poke each lipid: cholesterol mid-leaflet, PIP₂ at its headgroup, GM3 at its sugars
+function memCenter(m, out) { return out.set(m.pos.x, m.kind === 'gm3' ? 0.064 : m.kind === 'pip' ? -0.05 : (m.leaf ? -0.03 : 0.03), m.pos.z); }
+function update(dt, t) {
+  const playing = G.state === 'playing';
+  camera.getWorldPosition(_w); toLocal(camL, _w);
+  camera.getWorldQuaternion(_wq); camQL.copy(stageInvQ).multiply(_wq);
+
+  if (playing) {
+    G.t += dt;
+    for (const [k, v] of Object.entries(MODE().intro)) if (!G.intros.has(k) && G.t >= v) G.intros.add(k), G._new = (G._new || []).concat(k);
+    if (G._new) {
+      G.level = levelOf(G.t);
+      G.banner = `Level ${G.level}: ` + G._new.map(k => INTRO_MSG[k]).join('. '); G.bannerT = 5;
+      floatText(`Level ${G.level}`, new THREE.Vector3(0, 0.36, 0.05), CSS.ink, 1.6, 2); sfx('level');
+      if (G._new.includes('chol')) G.nextMem = 1.5;
+      G._new = null;
+    }
+    G.bannerT = Math.max(0, G.bannerT - dt);
+    G.boost = Math.max(0, G.boost - dt);
+    if (G.plug) { G.plugT -= dt; if (G.plugT <= 0) { unplug(); floatText('Drug unbound', new THREE.Vector3(0, 0.33, 0.06), CSS.drug); } }
+    G.nextItem -= dt; if (G.nextItem <= 0) { spawnItem(); G.nextItem = rnd(1.0, 1.6); }
+    const r = ramp(), M = MODE();
+    const rates = { det: (0.22 + 0.3 * r) * M.foe, amp: (0.06 + 0.05 * r) * M.foe, sma: (0.045 + 0.03 * r) * M.foe, drug: 0.045 * M.foe };
+    for (const k in rates) if (G.intros.has(k)) {
+      if (G.nextFoe[k] === undefined) G.nextFoe[k] = k === 'det' ? 1 : rnd(2, 5);
+      G.nextFoe[k] -= dt; if (G.nextFoe[k] <= 0) { spawnFoe(k); G.nextFoe[k] = (1 / rates[k]) * rnd(0.6, 1.4); }
+    }
+    if (G.intros.has('chol')) { G.nextMem -= dt; if (G.nextMem <= 0) { spawnMem(); G.nextMem = rnd(4.5, 7); } }
+    if (G.t >= TUNE.roundSeconds) endRound(true);
+  } else if (G.state === 'over') {
+    G.overT -= dt;
+    if (G.overT <= 0 && !overPanel.mesh.visible) { overPanel.mesh.visible = true; hudPanel.mesh.visible = false; overPanel.redraw(); }
+  }
+
+  // solubilised: the protein–detergent complex lifts out and the bilayer closes behind it
+  const solub = G.state === 'over' && !G.survived;
+  PR.lift = solub ? PR.lift + (0.36 - PR.lift) * Math.min(1, dt * 1.2) : (G.state === 'menu' ? 0 : PR.lift * 0.9);
+  G.gap = lerp(G.gap, solub && PR.lift > 0.1 ? 0 : 1, Math.min(1, dt * 2.5));
+  G.instab = lerp(G.instab, solub && PR.lift > 0.15 ? 0 : Math.min(1, boundSum() / MAX_BOUND), Math.min(1, dt * (solub ? 0.8 : 2.5)));
+
+  // protein: idle bob, look at you, wave, faces
+  PR.g.position.y = PR.lift;
+  PR.head.position.y = HEAD_Y + Math.sin(t * 2) * 0.002 + (solub ? Math.sin(t * 3) * 0.004 : 0);
+  const look = Math.atan2(camL.x, Math.max(0.05, camL.z));
+  PR.yaw = lerp(PR.yaw, clamp(look, -0.6, 0.6), Math.min(1, dt * 4)); PR.head.rotation.y = PR.yaw;
+  PR.hurt = Math.max(0, PR.hurt - dt); PR.eat = Math.max(0, PR.eat - dt);
+  PR.blinkIn -= dt; if (PR.blinkIn <= 0) { PR.blink = 0.13; PR.blinkIn = rnd(2.2, 5); } PR.blink = Math.max(0, PR.blink - dt);
+  let nearFoe = false; headPos(_h); for (const f of foes) if (f.pos.distanceTo(_h) < 0.22) nearFoe = true;
+  setFace(G.state === 'over' && !G.survived ? 'sad' : PR.hurt > 0 ? 'hurt' : PR.eat > 0 ? 'eat' : (nearFoe || boundSum() >= 6 || G.plug) ? 'worried' : PR.blink > 0 ? 'blink' : 'happy');
+  for (const a of PR.arms) {
+    const base = solub ? 0.9 : PR.eat > 0 ? -0.9 : PR.hurt > 0 ? 0.7 : -0.25 + Math.sin(t * 2.4 + (a.s > 0 ? 0 : 1.5)) * 0.2;
+    a.pivot.rotation.z = lerp(a.pivot.rotation.z, a.s * base * -1, Math.min(1, dt * 10));
+  }
+
+  // pokes from fingertips on the panels (as well as point-and-pinch)
+  for (const x of inputs) if (x.has && x.pokeCool <= 0) for (const p of panels()) {
+    if (p === hudPanel) continue;
+    stage.localToWorld(_w.copy(x.tip)); p.mesh.worldToLocal(_w);
+    if (Math.abs(_w.z) < 0.015 && Math.abs(_w.x) < p.wM / 2 && Math.abs(_w.y) < p.hM / 2) {
+      const b = p.at({ x: _w.x / p.wM + 0.5, y: _w.y / p.hM + 0.5 });
+      if (b) { pressButton(b.id); x.pokeCool = 0.8; haptic(x, 0.4, 25); }
+    }
+  }
+  // ray hover and visible pointer lines while a menu is up
+  const menuUp = panels().some(p => p !== hudPanel);
+  for (const p of panels()) p._hov = null;
+  for (const x of inputs) {
+    if (!x.src || !renderer.xr.isPresenting) continue;
+    if (menuUp) { const r = ctrlRay(x), hit = panelHitFromRay(r.o, r.d); x.line.visible = true; x.line.scale.z = hit ? hit.dist : 0.35; if (hit && hit.btn) hit.panel._hov = hit.btn.id; }
+    else x.line.visible = false;
+  }
+  if (!renderer.xr.isPresenting && mouse.inside) { mouseRay(); const hit = panelHitFromRay(mouse.wo, mouse.wd); if (hit && hit.btn) hit.panel._hov = hit.btn.id; }
+  for (const p of panels()) if (p !== hudPanel && p.hover !== p._hov) { p.hover = p._hov; p.redraw(); }
+
+  // falling solutes and ions
+  headPos(_h);
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.state !== 'fade') it.a = Math.min(1, it.a + dt * 3);
+    if (it.state === 'held') {
+      const src = it.heldBy ? it.heldBy.grab : null;
+      if (src) it.pos.lerp(src, 0.6);
+      else if (mouse.held === it) {
+        // drag across the plane through his axis that faces the camera
+        mouseRay(); _d.set(camL.x, 0, camL.z).normalize();
+        const denom = mouse.d.dot(_d);
+        if (Math.abs(denom) > 1e-4) { const tt = -mouse.o.dot(_d) / denom; if (tt > 0) it.pos.lerp(_tmp.copy(mouse.o).addScaledVector(mouse.d, tt), 0.5); }
+      }
+      if (it.pos.distanceTo(_h) < TUNE.feedRadius) feed(it);
+    } else if (it.state === 'fall') {
+      if (it.vy > it.vFall) it.vy = Math.max(it.vFall, it.vy - 0.3 * dt);
+      it.pos.y += it.vy * dt; it.pos.x += it.vx * dt; it.pos.z += it.vz * dt; it.vx *= 1 - dt * 1.2; it.vz *= 1 - dt * 1.2;
+      it.pos.x += Math.sin(t * 1.3 + it.ph) * 0.008 * dt; it.pos.z += Math.cos(t * 1.1 + it.ph) * 0.006 * dt;
+      if (it.pos.distanceTo(_h) < HEAD_R + it.r) { if (playing) feed(it); else it.state = 'fade'; }
+      else if (it.pos.y < LEAF + 0.025) it.state = 'fade';
+    } else if (it.state === 'fade') {
+      it.a -= dt * 3; if (it.a <= 0) { removeEnt(it); items.splice(i, 1); continue; }
+    }
+    it.obj.position.copy(it.pos); it.obj.scale.setScalar(Math.max(0.01, it.a) * TUNE.itemScale);
+    it.obj.rotation.y = Math.atan2(camL.x - it.pos.x, camL.z - it.pos.z) + Math.sin(t + it.ph) * 0.3;
+  }
+
+  // cargo travelling down the channel and out into the cytoplasm
+  for (let i = cargo.length - 1; i >= 0; i--) {
+    const c = cargo[i]; c.t += dt;
+    const tA = 0.22, tB = c.kind === 'lig' ? 0.75 : 0.5;
+    if (c.t < tA) { const e = 1 - Math.pow(1 - c.t / tA, 2); c.obj.position.lerpVectors(c.start, _h, e); c.obj.scale.setScalar(lerp(1, 0.7, e) * TUNE.itemScale); }
+    else {
+      if (!c.slurped) { c.slurped = true; sfx('slurp'); }
+      const e = clamp((c.t - tA) / tB, 0, 1);
+      c.obj.position.set(Math.sin(e * TAU * 1.5) * 0.004, lerp(HEAD_Y - 0.02, OUT_Y, e) + PR.lift, 0);
+    }
+    if (c.t >= tA + tB) {
+      cargo.splice(i, 1);
+      G.score += c.pts; if (c.kind === 'lig') G.solutes++; else G.ions++;
+      floatText('+' + c.pts, new THREE.Vector3(rnd(-0.03, 0.03), OUT_Y - 0.03, 0.05), CSS.ink, 0.9);
+      sfx('deliver');
+      c.vel = new THREE.Vector3(rnd(-0.06, 0.06), -0.05, rnd(0.0, 0.06)); c.life = 1.6; c.spinF = V3(); c.pos = c.obj.position.clone(); c.drift = true;
+      flyers.push(c);
+    }
+  }
+
+  // free baddies swimming in
+  const hs = hitters();
+  for (let i = foes.length - 1; i >= 0; i--) {
+    const f = foes[i]; f.t += dt; f.a = Math.min(1, f.a + dt * 2.5);
+    const target = f.kind === 'drug' ? _tmp.set(0, HEAD_Y + PR.lift, 0) : _tmp.set(Math.cos(f.aim) * 0.045, f.aimY + PR.lift, Math.sin(f.aim) * 0.045);
+    _d.subVectors(target, f.pos); const dist = _d.length();
+    if (playing && dist < (f.kind === 'drug' ? HEAD_R + 0.012 : 0.014)) { bindFoe(f); continue; }
+    _d.normalize().multiplyScalar(f.speed);
+    const wig = Math.sin(f.t * 3 + f.ph) * f.speed * 0.6;
+    _d.x += -_d.z / f.speed * wig; _d.z += _d.x / f.speed * wig * 0.3; _d.y += Math.cos(f.t * 2.2 + f.ph) * f.speed * 0.3;
+    f.vel.lerp(_d, Math.min(1, dt * 3)); f.pos.addScaledVector(f.vel, dt);
+    // a hand or controller touching it knocks it away
+    let hit = null;
+    if (playing) for (const h of hs) if (h.p.distanceTo(f.pos) < h.r + f.r) { hit = h; break; }
+    if (hit) { swat(f, hit.v); haptic(hit.x, 0.7, 40); continue; }
+    poseBaddie(f, dt, t);
+  }
+
+  // stuck-on baddies: wiggle, can be pulled off by hand
+  for (let i = bound.length - 1; i >= 0; i--) {
+    const b = bound[i]; b.bt += dt;
+    boundAnchor(b, _w);
+    if (b.held && b.heldBy) {
+      const g = b.heldBy.grab;
+      if (g.distanceTo(_w) > TUNE.pullDistance) {
+        const hv = b.heldBy.vel.clone(); release(b.heldBy); b.pos.copy(g);
+        pullOff(b, hv.multiplyScalar(0.5)); floatText('Pulled off!', new THREE.Vector3(0, 0.33, 0.06), CSS.leaf); sfx('thwack'); G.score += 2;
+        continue;
+      }
+      b.pos.lerpVectors(_w, g, 0.5);
+    } else {
+      const e = 1 - Math.pow(1 - clamp(b.bt / 0.35, 0, 1), 3);
+      b.pos.lerpVectors(b.from, _w, e);
+    }
+    if (b.ringObj) {
+      b.ringObj.scale.setScalar(Math.min(1, 0.2 + b.bt * 2.5)); b.ringObj.rotation.z += dt * 0.5;
+      b.obj.position.copy(b.pos); b.head.rotation.y = Math.atan2(camL.x - b.pos.x, camL.z - b.pos.z);
+      chomp(b, t);
+    } else {
+      // detergent: tail points outward from his legs
+      _d.set(b.pos.x, 0, b.pos.z).normalize();
+      poseBaddie(b, dt, t, _d);
+    }
+  }
+
+  // the drug plugging the pore
+  if (G.plug) {
+    const e = G.plug; e.bt += dt;
+    _w.set(0, PLUG_Y + PR.lift, 0);
+    if (e.held && e.heldBy) {
+      const g = e.heldBy.grab;
+      if (g.distanceTo(_w) > TUNE.pullDistance) { const hv = e.heldBy.vel.clone(); release(e.heldBy); e.pos.copy(g); unplug(hv.multiplyScalar(0.5)); floatText('Unplugged!', new THREE.Vector3(0, 0.33, 0.06), CSS.leaf); G.score += 5; }
+      else e.pos.lerpVectors(_w, g, 0.5);
+    } else { const k = 1 - Math.pow(1 - clamp(e.bt / 0.3, 0, 1), 3); e.pos.lerpVectors(e.from, _w, k); }
+    if (G.plug) { e.obj.position.copy(e.pos); e.obj.rotation.set(0, Math.atan2(camL.x - e.pos.x, camL.z - e.pos.z), Math.sin(t * 13) * 0.04); e.obj.scale.setScalar(1.05 * TUNE.itemScale); }
+  }
+
+  // helpful lipids diffusing through the membrane
+  for (let i = memItems.length - 1; i >= 0; i--) {
+    const m = memItems[i]; m.t += dt;
+    if (m.state === 'bound') {
+      const site = _tmp.set(Math.cos(m.siteA) * 0.078, 0, Math.sin(m.siteA) * 0.078);
+      if (m.t < BIND_S) { const e = 1 - Math.pow(1 - clamp(m.t / 0.35, 0, 1), 2); m.pos.lerpVectors(m.from, site, e); m.a = 1; }
+      else { const u = (m.t - BIND_S) / 0.7; m.pos.copy(site).multiplyScalar(1 + u * 0.8); m.a = clamp(1 - u, 0, 1); if (u >= 1) { removeEnt(m); memItems.splice(i, 1); continue; } }
+      if (G.state === 'over' && m.t < BIND_S) m.t = BIND_S;
+    } else {
+      const T1 = m.tin, T2 = T1 + m.stay, T3 = T2 + m.tout;
+      if (m.t < T1) m.pos.lerpVectors(m.from, m.to, 1 - Math.pow(1 - m.t / T1, 3));
+      else if (m.t < T2) { m.pos.copy(m.to); m.pos.x += Math.sin((m.t - T1) * 2.3 + m.ph) * 0.006; m.pos.z += Math.cos((m.t - T1) * 1.9) * 0.006; }
+      else { if (m.state !== 'out') { m.state = 'out'; if (playing) sfx('lipidOut'); } const u = (m.t - T2) / m.tout; m.pos.lerpVectors(m.to, m.from, u * u); }
+      if (m.t >= T3) { removeEnt(m); memItems.splice(i, 1); continue; }
+      // poke it with a fingertip or controller to send it to the protein
+      if (playing) { memCenter(m, _w); for (const h of hs) if (h.p.distanceTo(_w) < h.r + 0.022) { catchMem(m); haptic(h.x, 0.5, 30); break; } }
+      if (m.state !== 'bound') {
+        memCenter(m, _w);
+        m.glow.position.copy(_w); m.glow.scale.setScalar(1 + Math.sin(t * 6) * 0.12);
+        const left = clamp(1 - m.t / T3, 0, 1);
+        m.ringT -= dt;
+        if (m.ringT <= 0) { m.ringT = 0.1; m.ring.geometry.dispose(); m.ring.geometry = new THREE.RingGeometry(0.010, 0.015, 24, 1, Math.PI / 2, TAU * Math.max(0.01, left)); }
+        m.ring.position.set(m.pos.x, m.leaf ? -0.12 : 0.12, m.pos.z); m.ring.quaternion.copy(camQL);
+        m.ring.material.color.setHex(left < 0.3 && Math.floor(t * 8) % 2 ? COL.ink : (m.kind === 'chol' ? COL.chol : m.kind === 'pip' ? COL.pip : COL.sia));
+      }
+    }
+    // place the model in its leaflet
+    const s = m.leaf ? -1 : 1, rip = G.instab > 0.01 ? (Math.sin(m.pos.x * 15 + t * 2.2) + Math.sin(m.pos.z * 18 - t * 3.0)) * 0.005 * G.instab : 0;
+    if (m.kind === 'chol') m.obj.position.set(m.pos.x, s * 0.035 + rip + (m.state === 'bound' ? PR.lift : 0), m.pos.z);
+    else if (m.kind === 'pip') m.obj.position.set(m.pos.x, -LEAF + rip + (m.state === 'bound' ? PR.lift : 0), m.pos.z);
+    else m.obj.position.set(m.pos.x, LEAF + rip + (m.state === 'bound' ? PR.lift : 0), m.pos.z);
+    m.obj.rotation.y = Math.atan2(camL.x - m.pos.x, camL.z - m.pos.z) * 0.85;
+    m.obj.scale.setScalar(Math.max(0.01, m.a));
+  }
+
+  // things flying away
+  for (let i = flyers.length - 1; i >= 0; i--) {
+    const f = flyers[i]; f.life -= dt;
+    if (!f.pos) f.pos = f.obj.position.clone();
+    f.pos.addScaledVector(f.vel, dt);
+    if (!f.drift) f.vel.y -= 0.35 * dt; else f.vel.multiplyScalar(1 - dt * 0.8);
+    f.obj.position.copy(f.pos);
+    if (f.spinF) { f.obj.rotation.x += f.spinF.x * dt; f.obj.rotation.y += f.spinF.y * dt; f.obj.rotation.z += f.spinF.z * dt; }
+    f.obj.scale.setScalar(Math.max(0.01, Math.min(1, f.life / 0.5)) * (f.drift ? 0.7 : 1) * (f.memFly ? 1 : TUNE.itemScale));
+    if (f.life <= 0) { removeEnt(f); flyers.splice(i, 1); }
+  }
+
+  // floating words
+  for (let i = texts.length - 1; i >= 0; i--) {
+    const x = texts[i]; x.life -= dt; x.sp.position.y += dt * 0.03;
+    x.sp.material.opacity = clamp(x.life / 0.4, 0, 1);
+    if (x.life <= 0) { stage.remove(x.sp); x.sp.material.map.dispose(); x.sp.material.dispose(); texts.splice(i, 1); }
+  }
+
+  updateMembrane(t);
+
+  if (hudPanel.mesh.visible) {
+    const sig = [G.score, Math.ceil(TUNE.roundSeconds - G.t), bound.map(b => b.kind[0]).join(''), G.plug ? 1 : 0, Math.ceil(G.boost), G.bannerT > 0 ? G.banner : '', G.level].join('|');
+    if (sig !== G.hudSig) { G.hudSig = sig; hudPanel.redraw(); }
+  }
+}
+function chomp(b, t) { const open = Math.floor(t * 5 + b.ph) % 2 === 0; b.head.userData.body.material = toon(0xffffff, TEX[b.kind + (open ? 'O' : 'S')]); }
+function poseBaddie(f, dt, t, tailDir) {
+  f.obj.position.copy(f.pos); f.obj.scale.setScalar(Math.max(0.01, f.a) * TUNE.itemScale);
+  if (f.kind === 'drug') { f.obj.rotation.x += f.spin.x * dt; f.obj.rotation.y += f.spin.y * dt; f.obj.rotation.z += f.spin.z * dt; return; }
+  f.head.rotation.y = Math.atan2(camL.x - f.pos.x, camL.z - f.pos.z);
+  chomp(f, t);
+  if (f.kind === 'det') {
+    const dir = tailDir || _e2.copy(f.vel).normalize().negate();
+    if (!tailDir && f.vel.lengthSq() < 1e-8) dir.set(0, 1, 0);
+    _perp.crossVectors(dir, Y_AXIS); if (_perp.lengthSq() < 1e-6) _perp.set(1, 0, 0); _perp.normalize();
+    f.beads.forEach((b, k) => { b.position.copy(dir).multiplyScalar(0.013 + k * 0.0075).addScaledVector(_perp, Math.sin(t * 10 - k * 0.9 + f.ph) * 0.0012 * (k + 1)); b.position.y += k * 0.0012; });
+  } else {
+    // polymer chain follows the path its head has swum
+    const last = f.trail[f.trail.length - 1];
+    if (!last || last.distanceTo(f.pos) > 0.004) { f.trail.push(f.pos.clone()); if (f.trail.length > 40) f.trail.shift(); }
+    f.beads.forEach((b, k) => {
+      const idx = f.trail.length - 1 - Math.round((k + 1) * 1.6);
+      const p = f.trail[Math.max(0, idx)];
+      b.position.subVectors(p, f.pos);
+      if (idx < 0) b.position.addScaledVector(_e2.copy(f.vel).normalize(), -(k + 1) * 0.007);
+      b.position.divideScalar(TUNE.itemScale);
+      if (f.kind === 'sma' && b.children.length) b.rotation.set(Math.PI / 2, 0, 0);
+    });
+  }
+}
+const _e2 = V3(), _perp = V3();
+
+/* ---------------- placing the diorama in your room ---------------- */
+function tryPlace() {
+  camera.getWorldPosition(_w);
+  if (_w.y < 0.3) return;
+  camera.getWorldDirection(_d); _d.y = 0; if (_d.lengthSq() < 1e-4) _d.set(0, 0, -1); _d.normalize();
+  stage.position.copy(_w).addScaledVector(_d, TUNE.distance); stage.position.y = _w.y - TUNE.eyeDrop;
+  stage.rotation.set(0, Math.atan2(-_d.x, -_d.z), 0);
+  syncStage(); facePanels();
+  needPlace = false;
+}
+
+/* ---------------- headset sessions and the page around it ---------------- */
+const overlay = document.getElementById('overlay'), statusEl = document.getElementById('status');
+const btnAR = document.getElementById('btnAR'), btnVR = document.getElementById('btnVR'), btnMouse = document.getElementById('btnMouse'), btnReopen = document.getElementById('reopen');
+let session = null, placeFrames = 0;
+async function startXR(mode) {
+  try {
+    audio();
+    session = await navigator.xr.requestSession(mode, { requiredFeatures: ['local-floor'], optionalFeatures: ['hand-tracking'] });
+    renderer.xr.setReferenceSpaceType('local-floor');
+    await renderer.xr.setSession(session);
+    scene.background = mode === 'immersive-ar' ? null : VR_SKY;
+    vrFloor.visible = mode !== 'immersive-ar';
+    overlay.hidden = true; btnReopen.hidden = true;
+    needPlace = true; placeFrames = 0;
+    session.addEventListener('end', () => {
+      session = null; scene.background = PAPER; vrFloor.visible = false;
+      stage.position.copy(DESK_STAGE); stage.rotation.set(0, 0, 0); syncStage(); facePanels();
+      camera.position.copy(DESK_EYE); camera.lookAt(DESK_LOOK);
+      for (const x of inputs) { release(x); x.dot.visible = false; x.line.visible = false; }
+      overlay.hidden = false;
+      if (G.state === 'playing') showMenu();
+    });
+  } catch (err) {
+    statusEl.textContent = 'The headset session could not start here. Open this page directly in the Meta Quest browser (not inside another app) and try again.';
+  }
+}
+btnAR.addEventListener('click', () => startXR('immersive-ar'));
+btnVR.addEventListener('click', () => startXR('immersive-vr'));
+btnMouse.addEventListener('click', () => { audio(); overlay.hidden = true; btnReopen.hidden = false; });
+btnReopen.addEventListener('click', () => { overlay.hidden = false; btnReopen.hidden = true; });
+(async () => {
+  let ar = false, vr = false;
+  if (navigator.xr) {
+    try { ar = await navigator.xr.isSessionSupported('immersive-ar'); } catch (e) {}
+    try { vr = await navigator.xr.isSessionSupported('immersive-vr'); } catch (e) {}
+  }
+  btnAR.hidden = !ar; btnVR.hidden = ar || !vr;
+  const embedded = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+  statusEl.textContent = ar ? 'Mixed reality is ready. Stand or sit at a clear table; the membrane appears half a metre in front of you.'
+    : vr ? "This browser offers VR but not mixed reality, so you'll get a virtual room instead of passthrough."
+    : embedded ? "This preview is embedded in another page, which blocks the headset. To play in mixed reality, open the game's own web address directly in the Meta Quest 3 browser. You can try it here with the mouse."
+    : 'No headset found here. Open this page in the Meta Quest 3 browser to play in mixed reality, or try it here with the mouse.';
+})();
+window.addEventListener('resize', () => {
+  if (renderer.xr.isPresenting) return;
+  camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ---------------- boot ---------------- */
+async function fontsReady() {
+  try { await Promise.race([Promise.all([document.fonts.load(`48px ${FD}`), document.fonts.load(`48px ${FB}`)]), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+}
+await fontsReady();
+buildTextures();
+buildMembrane();
+buildProtein();
+buildPanels();
+makeLabel('extracellular', -MR - 0.02, 0.12, 0.12);
+makeLabel('cytoplasm', -MR - 0.02, -0.12, 0.12);
+showMenu();
+const clock = new THREE.Clock();
+let elapsed = 0;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(0.05, clock.getDelta()); elapsed += dt;
+  if (needPlace && renderer.xr.isPresenting) { if (++placeFrames > 2) tryPlace(); }
+  readInputs(dt);
+  update(dt, elapsed);
+  renderer.render(scene, camera);
+});
+// ?debug exposes a test hook (used to check the game logic without a headset)
+if (new URLSearchParams(location.search).has('debug')) window.__dgs = { G, items, foes, bound, memItems, cargo, flyers, startRound, spawnFoe, spawnMem, spawnItem, feed, pressButton, catchMem, endRound, MODES, TUNE,
+  step: (n, dt = 1 / 60) => { for (let i = 0; i < n; i++) { elapsed += dt; readInputs(dt); update(dt, elapsed); } }, panels: () => [menuPanel, hudPanel, overPanel].map(p => p.mesh.visible) };
+</script>
+
+</body>
+</html>

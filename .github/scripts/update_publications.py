@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh group/publications.html from PubMed (or Europe PMC if PubMed is down).
+"""Refresh publications.html from PubMed (or Europe PMC if PubMed is down).
 
 Run weekly by .github/workflows/update-publications.yml. Replaces everything
 between the PUBS:START and PUBS:END markers in the page; the rest of the page
@@ -20,7 +20,7 @@ from pathlib import Path
 
 TERM = "Stansfeld PJ[au]"          # PubMed author search
 MIN_PAPERS = 50                    # refuse to publish a suspiciously short list
-PAGE = Path(__file__).resolve().parents[2] / "group" / "publications.html"
+PAGE = Path(__file__).resolve().parents[2] / "publications.html"
 START, END = "<!-- PUBS:START -->", "<!-- PUBS:END -->"
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
 SKIP_TYPES = {"Published Erratum", "Preprint", "Retraction of Publication", "Expression of Concern"}
@@ -77,7 +77,7 @@ def in_group(last, initials, year):
 def eutils(endpoint, **params):
     params.update(tool="stansfeld-group-site")
     url = EUTILS + endpoint + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": "stansfeld-group-site (+https://pstansfeld.github.io/group/)"})
+    req = urllib.request.Request(url, headers={"User-Agent": "stansfeld-group-site (+https://pstansfeld.github.io/)"})
     for attempt in range(5):
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
@@ -259,7 +259,7 @@ def clean_title(s):
 
 def epmc_get(params):
     url = EPMC + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": "stansfeld-group-site (+https://pstansfeld.github.io/group/)"})
+    req = urllib.request.Request(url, headers={"User-Agent": "stansfeld-group-site (+https://pstansfeld.github.io/)"})
     for attempt in range(4):
         try:
             with urllib.request.urlopen(req, timeout=90) as r:

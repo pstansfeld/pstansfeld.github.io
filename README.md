@@ -1,1 +1,24 @@
 # pstansfeld.github.io
+
+Website of the Stansfeld Research Group, University of Warwick: https://pstansfeld.github.io/
+
+Static site for GitHub Pages (no build step).
+
+## Group site
+
+- One HTML file per page (`index.html`, `members.html`, `pi.html`, `alumni.html`, `publications.html`, `research-tools.html`, `positions.html`, `find-us.html`, `games-vr.html`, `complexes.html`); shared styles in `style.css`; images in `images/`.
+- To add a person, copy an `<article class="person">` block in `members.html` (or `<article class="alum">` in `alumni.html`).
+- The menu is repeated at the top of each page; edit all files if you add a page.
+- `group/` only holds redirects from the site's old /group/ addresses.
+
+## Publications
+
+Every Monday a GitHub Action (`.github/workflows/update-publications.yml`) rebuilds the list in `publications.html` from PubMed (`Stansfeld PJ[au]`), falling back to Europe PMC if PubMed is unavailable. It also runs when `members.html` or `alumni.html` change, because group members' names are shown in bold. Don't edit between the `PUBS:START`/`PUBS:END` markers by hand. To refresh now: **Actions** tab → **Update publications** → **Run workflow**.
+
+## Complexes
+
+Structure images are in `images/complexes/`. The Mol* views and downloads come from the [pstansfeld/ecoli-complexes](https://github.com/pstansfeld/ecoli-complexes) repo (forked from Rebecca Mann's `rebeccamann/rebeccamann.github.io`).
+
+## Games
+
+`Dont-Get-Solubilised-XR.html`, `Dont-Get-Solubilised.html`, `Active-Site-Sorter.html` (uses `levels/`), `Drop-the-Dose.html`, `ESKAPE-Chase.html`, `ESKAPE-Containment.html`, `ESKAPE-Invaders.html`, `Galaxy-ESKAPE.html`, `SuperBugs.html`, `Superbug-Showdown.html`, `Superbug-Smackdown.html`. `MD-example.molx` and `Elongasome.molx` are used by the VR demos.
