@@ -106,6 +106,12 @@ figure img {
 figure a { display: block; }
 
 /* ---------- Home ---------- */
+.story { margin: 0 0 48px; }
+.story p { font-size: 1.1rem; line-height: 1.7; margin: 0 0 22px; }
+.story figure { margin: 0; }
+.split { display: grid; grid-template-columns: 1fr 1.2fr; gap: 40px; align-items: center; }
+.split p { margin: 0; }
+.split.flip figure { order: -1; }
 .explore { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 48px; }
 .explore a {
   display: block; padding: 20px 22px; border-radius: var(--radius);
@@ -249,6 +255,10 @@ figure a { display: block; }
   main { padding: 30px 0 56px; }
   .banner { aspect-ratio: 16 / 9; margin-bottom: 24px; }
   .lead-card, .pi { grid-template-columns: 1fr; }
+  .story { margin-bottom: 36px; }
+  .story p { font-size: 1rem; }
+  .split { grid-template-columns: 1fr; gap: 18px; }
+  .split.flip figure { order: 0; }
   .lead-card img { width: 100%; max-width: 260px; }
   .pi-photo { max-width: 280px; }
   .people { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 14px; }
