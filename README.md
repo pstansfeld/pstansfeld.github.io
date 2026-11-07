@@ -6,11 +6,11 @@ Static site for GitHub Pages (no build step).
 
 ## Group site
 
-- One HTML file per page (`index.html`, `members.html`, `pi.html`, `alumni.html`, `publications.html`, `research-tools.html`, `positions.html`, `find-us.html`, `games-vr.html`, `complexes.html`); shared styles in `style.css`; images in `images/`.
+- One HTML file per page (`index.html`, `members.html`, `pi.html`, `alumni.html`, `publications.html`, `research-tools.html`, `funding.html`, `positions.html`, `find-us.html`, `games-vr.html`, `complexes.html`); shared styles in `style.css`; images in `images/`.
 - To add a person, copy an `<article class="person">` block in `members.html` (or `<article class="alum">` in `alumni.html`).
 - The menu is repeated at the top of each page; edit all files if you add a page.
 - `group/` only holds redirects from the site's old /group/ addresses.
-- `_drafts/` holds pages that aren't published yet (GitHub Pages skips folders starting with `_`). The Photos page (`_drafts/photos.html`, images in `_drafts/images/photos/`) is there, as is a Funding page (`_drafts/funding.html`, yellow highlights mark details still to fill in); to publish it, move it back to the top level and add Photos to the menu on every page.
+- `_drafts/` holds pages that aren't published yet (GitHub Pages skips folders starting with `_`). The Photos page (`_drafts/photos.html`, images in `_drafts/images/photos/`) is there; to publish it, move it back to the top level and add Photos to the menu on every page.
 
 ## Publications
 
