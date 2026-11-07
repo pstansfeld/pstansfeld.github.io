@@ -346,3 +346,7 @@ figure a { display: block; }
 .grant li b { color: var(--ink); font-weight: 600; }
 .todo { background: #fff3bf; color: #6b5300; border-radius: 4px; padding: 0 4px; }
 @media (max-width: 760px) { .grants { grid-template-columns: 1fr; } }
+.themes .card { display: flex; flex-direction: column; }
+.themes .card a.go { display: block; margin-top: 4px; }
+.themes .card a.go:first-of-type { margin-top: auto; padding-top: 6px; }
+[id] { scroll-margin-top: 70px; }
