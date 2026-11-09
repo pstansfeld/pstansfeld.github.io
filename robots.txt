@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pstansfeld.github.io/sitemap.xml
